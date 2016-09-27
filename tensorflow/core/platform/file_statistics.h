@@ -17,6 +17,7 @@ limitations under the License.
 #define THIRD_PARTY_TENSORFLOW_CORE_PLATFORM_FILE_STATISTICS_H_
 
 #include "tensorflow/core/platform/types.h"
+#include <sys/stat.h>
 
 namespace tensorflow {
 

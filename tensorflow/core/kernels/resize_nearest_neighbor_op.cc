@@ -59,11 +59,11 @@ class ResizeNearestNeighborOp : public OpKernel {
 
     for (int b = 0; b < st.batch_size; ++b) {
       for (int y = 0; y < st.out_height; ++y) {
-        const int64 in_y =
+        const Eigen::Index in_y =
             std::min(static_cast<int64>(floorf(y * st.height_scale)),
                      (st.in_height - 1));
         for (int x = 0; x < st.out_width; ++x) {
-          const int64 in_x =
+          const Eigen::Index in_x =
               std::min(static_cast<int64>(floorf(x * st.width_scale)),
                        (st.in_width - 1));
           for (int c = 0; c < st.channels; ++c) {
@@ -133,11 +133,11 @@ class ResizeNearestNeighborOpGrad : public OpKernel {
 
     for (int c = 0; c < channels; ++c) {
       for (int y = 0; y < in_height; ++y) {
-        const int64 out_y = std::min(
+        const Eigen::Index out_y = std::min(
             static_cast<int64>(floorf(y * height_scale)), (out_height - 1));
 
         for (int x = 0; x < in_width; ++x) {
-          const int64 out_x = std::min(
+          const Eigen::Index out_x = std::min(
               static_cast<int64>(floorf(x * width_scale)), (out_width - 1));
 
           for (int b = 0; b < batch_size; ++b) {

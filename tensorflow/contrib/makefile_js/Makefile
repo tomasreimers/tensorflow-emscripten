@@ -116,12 +116,12 @@ DEPDIR := $(GENDIR)dep/
 $(shell mkdir -p $(DEPDIR) >/dev/null)
 
 # Settings for the target compiler.
-CXX := $(CC_PREFIX) gcc
+CXX := $(CC_PREFIX) emcc
 OPTFLAGS := -O0
-CXXFLAGS := --std=c++11 -DIS_SLIM_BUILD $(OPTFLAGS)
+CXXFLAGS := --std=c++11 -m64 -s USE_ZLIB=1 -DIS_SLIM_BUILD $(OPTFLAGS)
 LDFLAGS := \
 -L/usr/local/lib
-DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
+DEPFLAGS = -MT $@ -MMD -MP -m64 -MF $(DEPDIR)/$*.Td
 
 INCLUDES := \
 -I. \
@@ -138,8 +138,6 @@ INCLUDES += -I/usr/local/include
 
 LIBS := \
 -lstdc++ \
--lprotobuf \
--lz \
 -lm
 
 ifeq ($(HAS_GEN_HOST_PROTOC),true)
@@ -168,195 +166,6 @@ endif
 ifeq ($(TARGET),LINUX)
 	LIBS += -ldl -lpthread
 endif
-# If we're cross-compiling for the Raspberry Pi, use the right gcc.
-ifeq ($(TARGET),PI)
-	CXXFLAGS += -D__ANDROID_TYPES_SLIM__
-	LDFLAGS := -Wl,--no-whole-archive
-	LIBS += -ldl -lpthread
-	LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
-endif
-
-# Set up Android building
-ifeq ($(TARGET),ANDROID)
-# Override NDK_ROOT on the command line with your own NDK location, e.g.
-# make -f tensorflow/contrib/makefile/Makefile TARGET=ANDROID \
-# NDK_ROOT=/path/to/your/ndk
-# You need to have an Android version of the protobuf libraries compiled to link
-# in. The compile_android_protobuf.sh script may help.
-
-	OS_PATH :=
-	ifeq ($(HOST_OS),LINUX)
-		OS_PATH=linux
-	endif
-	ifeq ($(HOST_OS),OSX)
-		OS_PATH=darwin
-	endif
-	ifeq ($(HOST_OS),WINDOWS)
-		$(error "windows is not supported.")
-	endif
-
-	ifndef NDK_ROOT
-		$(error "NDK_ROOT is not defined.")
-	endif
-	CXX := $(CC_PREFIX) $(NDK_ROOT)/toolchains/arm-linux-androideabi-4.9/prebuilt/$(OS_PATH)-x86_64/bin/arm-linux-androideabi-g++
-	CXXFLAGS +=\
---sysroot $(NDK_ROOT)/platforms/android-21/arch-arm \
--Wno-c++11-narrowing \
--march=armv7-a \
--fPIE
-
-	INCLUDES = \
--I$(NDK_ROOT)/sources/android/support/include \
--I$(NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/include \
--I$(NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/libs/armeabi/include \
--I. \
--I$(MAKEFILE_DIR)/downloads/ \
--I$(MAKEFILE_DIR)/downloads/eigen-eigen-$(EIGEN_VERSION) \
--I$(MAKEFILE_DIR)/gen/protobuf/include \
--I$(PROTOGENDIR) \
--I$(PBTGENDIR)
-
-	LIBS := \
--lgnustl_static \
--lprotobuf \
--llog \
--lz \
--lm
-
-	LD := $(NDK_ROOT)/toolchains/arm-linux-androideabi-4.9/prebuilt/$(OS_PATH)-x86_64/arm-linux-androideabi/bin/ld
-	LDFLAGS := \
--march=armv7-a \
--L$(MAKEFILE_DIR)/gen/protobuf/lib \
--L$(NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/libs/armeabi-v7a \
--fPIE \
--pie \
--v
-
-	AR := $(NDK_ROOT)/toolchains/arm-linux-androideabi-4.9/prebuilt/$(OS_PATH)-x86_64/bin/arm-linux-androideabi-ar
-	ARFLAGS := r
-	LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
-
-endif  # ANDROID
-
-# Settings for iOS.
-ifeq ($(TARGET),IOS)
-	IPHONEOS_PLATFORM := $(shell xcrun --sdk iphoneos --show-sdk-platform-path)
-	IPHONEOS_SYSROOT := $(shell xcrun --sdk iphoneos --show-sdk-path)
-	IPHONESIMULATOR_PLATFORM := $(shell xcrun --sdk iphonesimulator \
-	--show-sdk-platform-path)
-	IPHONESIMULATOR_SYSROOT := $(shell xcrun --sdk iphonesimulator \
-	--show-sdk-path)
-	IOS_SDK_VERSION := $(shell xcrun --sdk iphoneos --show-sdk-version)
-	MIN_SDK_VERSION := 9.2
-# Override IOS_ARCH with ARMV7, ARMV7S, ARM64, or I386.
-	IOS_ARCH := X86_64
-	ifeq ($(IOS_ARCH),ARMV7)
-		CXXFLAGS += -miphoneos-version-min=$(MIN_SDK_VERSION) \
-		-arch armv7 \
-		-D__thread= \
-		-Wno-c++11-narrowing \
-		-mno-thumb \
-		-DTF_LEAN_BINARY \
-		-D__ANDROID_TYPES_SLIM__ \
-		-DMIN_LOG_LEVEL=0 \
-		-fno-exceptions \
-		-isysroot \
-		${IPHONEOS_SYSROOT}
-		LDFLAGS := -arch armv7 \
-		-miphoneos-version-min=${MIN_SDK_VERSION} \
-		-Xlinker -S \
-		-Xlinker -x \
-		-Xlinker -dead_strip \
-		-all_load \
-		-L$(GENDIR)protobuf_ios/lib \
-		-lz
-	endif
-	ifeq ($(IOS_ARCH),ARMV7S)
-		CXXFLAGS += -miphoneos-version-min=$(MIN_SDK_VERSION) \
-		-arch armv7s \
-		-D__thread= \
-		-Wno-c++11-narrowing \
-		-mno-thumb \
-		-DTF_LEAN_BINARY \
-		-D__ANDROID_TYPES_SLIM__ \
-		-DMIN_LOG_LEVEL=0 \
-		-fno-exceptions \
-		-isysroot \
-		${IPHONEOS_SYSROOT}
-		LDFLAGS := -arch armv7s \
-		-miphoneos-version-min=${MIN_SDK_VERSION} \
-		-Xlinker -S \
-		-Xlinker -x \
-		-Xlinker -dead_strip \
-		-all_load \
-		-L$(GENDIR)protobuf_ios/lib \
-		-lz
-	endif
-	ifeq ($(IOS_ARCH),ARM64)
-		CXXFLAGS += -miphoneos-version-min=$(MIN_SDK_VERSION) \
-		-arch arm64 \
-		-D__thread= \
-		-Wno-c++11-narrowing \
-		-DTF_LEAN_BINARY \
-		-D__ANDROID_TYPES_SLIM__ \
-		-DMIN_LOG_LEVEL=0 \
-		-fno-exceptions \
-		-isysroot \
-		${IPHONEOS_SYSROOT}
-		LDFLAGS := -arch arm64 \
-		-miphoneos-version-min=${MIN_SDK_VERSION} \
-		-Xlinker -S \
-		-Xlinker -x \
-		-Xlinker -dead_strip \
-		-all_load \
-		-L$(GENDIR)protobuf_ios/lib \
-		-lz
-	endif
-	ifeq ($(IOS_ARCH),I386)
-		CXXFLAGS += -mios-simulator-version-min=$(MIN_SDK_VERSION) \
-		-arch i386 \
-		-D__thread= \
-		-Wno-c++11-narrowing \
-		-DTF_LEAN_BINARY \
-		-D__ANDROID_TYPES_SLIM__ \
-		-DMIN_LOG_LEVEL=0 \
-		-fno-exceptions \
-		-isysroot \
-		${IPHONESIMULATOR_SYSROOT}
-		LDFLAGS := -arch i386 \
-		-mios-simulator-version-min=${MIN_SDK_VERSION} \
-		-Xlinker -S \
-		-Xlinker -x \
-		-Xlinker -dead_strip \
-		-all_load \
-		-L$(GENDIR)protobuf_ios/lib \
-		-lz
-	endif
-	ifeq ($(IOS_ARCH),X86_64)
-		CXXFLAGS += -mios-simulator-version-min=$(MIN_SDK_VERSION) \
-		-arch x86_64 \
-		-D__thread= \
-		-Wno-c++11-narrowing \
-		-DTF_LEAN_BINARY \
-		-D__ANDROID_TYPES_SLIM__ \
-		-DMIN_LOG_LEVEL=0 \
-		-fno-exceptions \
-		-isysroot \
-		${IPHONESIMULATOR_SYSROOT}
-		LDFLAGS := -arch x86_64 \
-		-mios-simulator-version-min=${MIN_SDK_VERSION} \
-		-Xlinker -S \
-		-Xlinker -x \
-		-Xlinker -dead_strip \
-		-all_load \
-		-L$(GENDIR)protobuf_ios/lib \
-		-lz
-	endif
-	OBJDIR := $(OBJDIR)ios_$(IOS_ARCH)/
-	LIBDIR := $(LIBDIR)ios_$(IOS_ARCH)/
-	BINDIR := $(BINDIR)ios_$(IOS_ARCH)/
-	DEPDIR := $(DEPDIR)ios_$(IOS_ARCH)/
-endif
 
 # This library is the main target for this makefile. It will contain a minimal
 # runtime that can be linked in to other programs.
@@ -364,7 +173,7 @@ LIB_NAME := libtensorflow-core.a
 LIB_PATH := $(LIBDIR)$(LIB_NAME)
 
 # A small example program that shows how to link against the library.
-BENCHMARK_NAME := $(BINDIR)benchmark
+BENCHMARK_NAME := $(BINDIR)benchmark.js
 
 # What sources we want to compile, derived from the main Bazel build using the
 # gen_file_lists.sh script.
@@ -444,7 +253,8 @@ $(BENCHMARK_NAME): $(BENCHMARK_OBJS) $(LIB_PATH)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) \
 	-o $(BENCHMARK_NAME) $(BENCHMARK_OBJS) \
-	$(LIBFLAGS) $(LIB_PATH) $(LDFLAGS) $(LIBS)
+	$(MAKEFILE_DIR)/downloads/protobuf-emscripten/src/.libs/libprotobuf.a \
+	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS)
 
 # Matches on the normal hand-written TensorFlow C++ source files.
 $(OBJDIR)%.o: %.cc | $(PBT_GEN_FILES)

@@ -82,12 +82,12 @@ class UnpackOp : public OpKernel {
       return;
     }
 
-    int64 before_dim = 1;
+    Eigen::DenseIndex before_dim = 1;
     for (int i = 0; i < axis; ++i) {
       before_dim *= input_shape.dim_size(i);
     }
 
-    int64 after_dim = 1;
+    Eigen::DenseIndex after_dim = 1;
     for (int i = axis + 1; i < input_shape.dims(); ++i) {
       after_dim *= input_shape.dim_size(i);
     }

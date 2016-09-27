@@ -147,7 +147,7 @@ class SplitOpCPU : public SplitOpBase<CPUDevice, T> {
     auto input_reshaped =
         input.shaped<T, 3>({prefix_dim_size, split_dim_size, suffix_dim_size});
 
-    const int64 split_dim_output_size = split_dim_size / num_split;
+    const Eigen::DenseIndex split_dim_output_size = split_dim_size / num_split;
     TensorShape output_shape(input_shape);
     output_shape.set_dim(split_dim, split_dim_output_size);
 
