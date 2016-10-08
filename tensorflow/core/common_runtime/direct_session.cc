@@ -999,6 +999,10 @@ DirectSession::RunState::RunState(const std::vector<string>& input_names,
 }
 
 DirectSession::RunState::~RunState() {
+
+  // this shouldn't happen b/c will never be notified
+  return;
+
   if (rendez != nullptr) {
     if (!executors_done.HasBeenNotified()) {
       rendez->StartAbort(errors::Cancelled("PRun cancellation"));
@@ -1010,6 +1014,10 @@ DirectSession::RunState::~RunState() {
 
 void DirectSession::WaitForNotification(RunState* run_state,
                                         int64 timeout_in_ms) {
+
+  // we're not actually threading
+  return;
+
   if (timeout_in_ms > 0) {
     bool notified = WaitForNotificationWithTimeout(&run_state->executors_done,
                                                    timeout_in_ms);

@@ -1659,6 +1659,13 @@ void ExecutorState::ScheduleReady(const TaggedNodeSeq& ready,
   if (stats_collector_) {
     scheduled_usec = nodestats::NowInUsec();
   }
+
+  // try to inline everything
+  for (auto& tagged_node : ready) {
+    Process(tagged_node, scheduled_usec);
+  }
+  return;
+
   if (inline_ready == nullptr) {
     // Schedule to run all the ready ops in thread pool.
     for (auto& tagged_node : ready) {
@@ -1821,7 +1828,11 @@ void ExecutorState::DumpState() {
   }
 }
 
-void ExecutorState::Finish() {
+void ExecutorState::Finish(
+) {
+  // don't let them kill the thread
+  return;
+
   mu_.lock();
   auto status = status_;
   auto done_cb = done_cb_;

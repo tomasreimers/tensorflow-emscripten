@@ -117,8 +117,11 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 
 # Settings for the target compiler.
 CXX := $(CC_PREFIX) emcc
-OPTFLAGS := -O0
-CXXFLAGS := --std=c++11 -m64 -s USE_ZLIB=1 -DIS_SLIM_BUILD $(OPTFLAGS)
+OPTFLAGS := -O2
+# if you'll need an arbitrary amount of memory, use -s ALLOW_MEMORY_GROWTH=1
+CXXFLAGS := --std=c++11 -m64 \
+-s USE_ZLIB=1 -s DEMANGLE_SUPPORT=1 -s TOTAL_MEMORY=268435456 -s ASSERTIONS=1 -s PTHREAD_HINT_NUM_CORES=1 \
+-DIS_SLIM_BUILD $(OPTFLAGS)
 LDFLAGS := \
 -L/usr/local/lib
 DEPFLAGS = -MT $@ -MMD -MP -m64 -MF $(DEPDIR)/$*.Td
@@ -225,8 +228,8 @@ PBT_CC_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_pb_text_files.txt)
 PROTO_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_proto_files.txt)
 BENCHMARK_SRCS := \
 tensorflow/core/util/reporter.cc \
-tensorflow/tools/benchmark/benchmark_model.cc \
-tensorflow/tools/benchmark/benchmark_model_main.cc
+$(MAKEFILE_DIR)/benchmark/benchmark_model.cc \
+$(MAKEFILE_DIR)/benchmark/benchmark_model_main.cc
 
 # File names of the intermediate files target compilation generates.
 TF_CC_OBJS := $(addprefix $(OBJDIR), $(TF_CC_SRCS:.cc=.o))
@@ -253,8 +256,8 @@ $(BENCHMARK_NAME): $(BENCHMARK_OBJS) $(LIB_PATH)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) \
 	-o $(BENCHMARK_NAME) $(BENCHMARK_OBJS) \
-	$(MAKEFILE_DIR)/downloads/protobuf-emscripten/src/.libs/libprotobuf.a \
-	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS)
+	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
+	$(MAKEFILE_DIR)/downloads/protobuf-emscripten/src/.libs/libprotobuf.a
 
 # Matches on the normal hand-written TensorFlow C++ source files.
 $(OBJDIR)%.o: %.cc | $(PBT_GEN_FILES)
