@@ -115,11 +115,8 @@ Status RunBenchmark(DataType input_data_type, TensorShape input_shape,
   run_options.set_trace_level(RunOptions::FULL_TRACE);
   RunMetadata run_metadata;
 
-
-  LOG(INFO) << "Beginning session run";
   s = session->Run(run_options, input_tensors, output_names, {},
                    &output_tensors, &run_metadata);
-  LOG(INFO) << "Ending session run";
 
   if (!s.ok()) {
     LOG(ERROR) << "Error during inference: " << s;

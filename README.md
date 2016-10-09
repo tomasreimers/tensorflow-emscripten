@@ -13,15 +13,26 @@ It is an active research project whether this is even feasible, and I will post 
 Clone the repository, and then from the root of the repository run:
 
 ```
-$ ./tensorflow/contrib/makefile_js/download_dependencies.js
+$ ./tensorflow/contrib/makefile_js/download_dependencies.sh
 $ emconfigure ./configure
 $ emmake make -f ./tensorflow/contrib/makefile_js/Makefile
 ```
 
-This will generate `./tensorflow/contrib/makefile_js/gen/bin/benchmark.js` (the standard benchmarking tool that ships with tensorflow) that can be run with `cd ./tensorflow/contrib/makefile_js/gen/bin/; node benchmark.js` (for more information on the benchmarking tool and how to run it, see `README.orig.md` in this directory).
+*TIP: Considering adding the flag '-jX' to the emmake command, which will multithread compilation with X threads.*
 
-Support for compiling other programs (hopefully) coming soon! ...once I can reliably test the benchmarking tool.
+This will generate `./tensorflow/contrib/makefile_js/gen/bin/benchmark.js` (the standard benchmarking tool that ships with tensorflow). To run it, first you need to download the inception graph from Google:
+
+```
+$ ./tensorflow/contrib/makefile_js/download_graphs.sh
+```
+
+This should create the directory `./graphs` with the google inception graph in it. Now the benchmark can be run (for more information on the benchmarking tool and how to run it, see `README.orig.md` in this directory). The benchmarker requires a path to the graph and mounts your filesystem on the `working/` path in the simulated node filesystem. To run the benchmarker
+
+```
+$ cd ./tensorflow/contrib/makefile_js/gen/bin
+$ node benchmark.js --graph=/working/PATH/TO/TENSORFLOW/FROM/ROOT/graphs/inception/tensorflow_inception_graph.pb
+```
 
 ## Author
 
-Tomas Reimers, September 2016
+Tomas Reimers, September-October 2016
