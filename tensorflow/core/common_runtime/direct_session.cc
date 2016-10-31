@@ -62,6 +62,9 @@ namespace tensorflow {
 namespace {
 
 int32 NumInterOpThreadsFromSessionOptions(const SessionOptions& options) {
+  // can't support more than 1 thread
+  return 1;
+
   const int32 t = options.config.inter_op_parallelism_threads();
   if (t != 0) return t;
   // Default to using the number of cores available in the process.
@@ -128,7 +131,7 @@ std::atomic_int_fast64_t DirectSession::step_id_counter_(1);
 void DirectSession::SchedClosure(thread::ThreadPool* pool,
                                  std::function<void()> c) {
 // TODO(sanjay): Get rid of __ANDROID__ path
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(__MAKEFILE_JS__)
   // On Android, there is no implementation of ThreadPool that takes
   // std::function, only Closure, which we cannot easily convert.
   //
@@ -1000,8 +1003,6 @@ DirectSession::RunState::RunState(const std::vector<string>& input_names,
 
 DirectSession::RunState::~RunState() {
 
-  // this shouldn't happen b/c will never be notified
-  return;
 
   if (rendez != nullptr) {
     if (!executors_done.HasBeenNotified()) {
@@ -1015,8 +1016,6 @@ DirectSession::RunState::~RunState() {
 void DirectSession::WaitForNotification(RunState* run_state,
                                         int64 timeout_in_ms) {
 
-  // we're not actually threading
-  return;
 
   if (timeout_in_ms > 0) {
     bool notified = WaitForNotificationWithTimeout(&run_state->executors_done,

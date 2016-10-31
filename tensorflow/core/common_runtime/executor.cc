@@ -1661,10 +1661,6 @@ void ExecutorState::ScheduleReady(const TaggedNodeSeq& ready,
   }
 
   // try to inline everything
-  for (auto& tagged_node : ready) {
-    Process(tagged_node, scheduled_usec);
-  }
-  return;
 
   if (inline_ready == nullptr) {
     // Schedule to run all the ready ops in thread pool.
@@ -1830,8 +1826,6 @@ void ExecutorState::DumpState() {
 
 void ExecutorState::Finish(
 ) {
-  // don't let them kill the thread
-  return;
 
   mu_.lock();
   auto status = status_;

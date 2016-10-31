@@ -121,7 +121,7 @@ OPTFLAGS := -O2
 # if you'll need an arbitrary amount of memory, use -s ALLOW_MEMORY_GROWTH=1
 CXXFLAGS := --std=c++11 -m64 \
 -s USE_ZLIB=1 -s DEMANGLE_SUPPORT=1 -s TOTAL_MEMORY=268435456 -s ASSERTIONS=1 -s PTHREAD_HINT_NUM_CORES=1 \
--DIS_SLIM_BUILD $(OPTFLAGS)
+-DIS_SLIM_BUILD -D__MAKEFILE_JS__ $(OPTFLAGS)
 LDFLAGS := \
 -L/usr/local/lib
 DEPFLAGS = -MT $@ -MMD -MP -m64 -MF $(DEPDIR)/$*.Td
@@ -131,7 +131,8 @@ INCLUDES := \
 -I$(MAKEFILE_DIR)/downloads/ \
 -I$(MAKEFILE_DIR)/downloads/eigen-eigen-$(EIGEN_VERSION) \
 -I$(PROTOGENDIR) \
--I$(PBTGENDIR)
+-I$(PBTGENDIR) \
+-I./bazel-genfiles/
 ifeq ($(HAS_GEN_HOST_PROTOC),true)
 	INCLUDES += -I$(MAKEFILE_DIR)/gen/protobuf-host/include
 endif
@@ -177,6 +178,7 @@ LIB_PATH := $(LIBDIR)$(LIB_NAME)
 
 # A small example program that shows how to link against the library.
 BENCHMARK_NAME := $(BINDIR)benchmark.js
+LABELER_NAME := $(BINDIR)labeler.js
 
 # What sources we want to compile, derived from the main Bazel build using the
 # gen_file_lists.sh script.
@@ -230,6 +232,8 @@ BENCHMARK_SRCS := \
 tensorflow/core/util/reporter.cc \
 $(MAKEFILE_DIR)/benchmark/benchmark_model.cc \
 $(MAKEFILE_DIR)/benchmark/benchmark_model_main.cc
+LABELER_SRCS := \
+$(MAKEFILE_DIR)/labeler/main.cc \
 
 # File names of the intermediate files target compilation generates.
 TF_CC_OBJS := $(addprefix $(OBJDIR), $(TF_CC_SRCS:.cc=.o))
@@ -239,11 +243,12 @@ PROTO_CC_SRCS := $(addprefix $(PROTOGENDIR), $(PROTO_SRCS:.proto=.pb.cc))
 PROTO_OBJS := $(addprefix $(OBJDIR), $(PROTO_SRCS:.proto=.pb.o))
 LIB_OBJS := $(PROTO_OBJS) $(TF_CC_OBJS) $(PBT_OBJS)
 BENCHMARK_OBJS := $(addprefix $(OBJDIR), $(BENCHMARK_SRCS:.cc=.o))
+LABELER_OBJS := $(addprefix $(OBJDIR), $(LABELER_SRCS:.cc=.o))
 
 .PHONY: clean cleantarget
 
 # The target that's compiled if there's no command-line arguments.
-all: $(LIB_PATH) $(BENCHMARK_NAME)
+all: $(LIB_PATH) $(BENCHMARK_NAME) $(LABELER_NAME)
 
 # Rules for target compilation.
 
@@ -258,6 +263,14 @@ $(BENCHMARK_NAME): $(BENCHMARK_OBJS) $(LIB_PATH)
 	-o $(BENCHMARK_NAME) $(BENCHMARK_OBJS) \
 	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
 	$(MAKEFILE_DIR)/downloads/protobuf-emscripten/src/.libs/libprotobuf.a
+
+$(LABELER_NAME): $(LABELER_OBJS) $(LIB_PATH)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) \
+	-o $(LABELER_NAME) $(LABELER_OBJS) \
+	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
+	$(MAKEFILE_DIR)/downloads/protobuf-emscripten/src/.libs/libprotobuf.a
+
 
 # Matches on the normal hand-written TensorFlow C++ source files.
 $(OBJDIR)%.o: %.cc | $(PBT_GEN_FILES)
