@@ -115,11 +115,16 @@ ThreadPool::~ThreadPool() {}
 
 void ThreadPool::Schedule(std::function<void()> fn) {
   CHECK(fn != nullptr);
-  impl_->Schedule(std::move(fn));
+  #if defined(__MAKEFILE_JS__)
+    fn();
+  #else
+    impl_->Schedule(std::move(fn));
+  #endif
 }
 
 void ThreadPool::ParallelFor(int64 total, int64 cost_per_unit,
                              std::function<void(int64, int64)> fn) {
+  assert(false); /* No support for EIGEN_USE_NONBLOCKING_THREAD_POOL */
   impl_->ParallelFor(total, cost_per_unit, std::move(fn));
 }
 

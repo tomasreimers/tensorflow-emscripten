@@ -379,7 +379,11 @@ bool DoConstantFolding(const ConstantFoldingOptions& opts,
   // Create the local executor and the Rendezvous for fetching back the
   // constants.
   auto runner = [thread_pool](Executor::Args::Closure c) {
-    thread_pool->Schedule(c);
+    #if defined(__MAKEFILE_JS__)
+      c();
+    #else
+      thread_pool->Schedule(c);
+    #endif
   };
   LocalExecutorParams params;
   params.device = device;

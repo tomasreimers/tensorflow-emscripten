@@ -119,9 +119,10 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 CXX := $(CC_PREFIX) emcc
 OPTFLAGS := -O2
 # if you'll need an arbitrary amount of memory, use -s ALLOW_MEMORY_GROWTH=1
-CXXFLAGS := --std=c++11 -m64 \
--s USE_ZLIB=1 -s DEMANGLE_SUPPORT=1 -s TOTAL_MEMORY=268435456 -s ASSERTIONS=1 -s PTHREAD_HINT_NUM_CORES=1 \
+CFLAGS := -m64 \
+-s USE_ZLIB=1 -s DEMANGLE_SUPPORT=1 -s ALLOW_MEMORY_GROWTH=1 -s ASSERTIONS=1 -s PTHREAD_HINT_NUM_CORES=1 \
 -DIS_SLIM_BUILD -D__MAKEFILE_JS__ $(OPTFLAGS)
+CXXFLAGS := --std=c++11 $(CFLAGS)
 LDFLAGS := \
 -L/usr/local/lib
 DEPFLAGS = -MT $@ -MMD -MP -m64 -MF $(DEPDIR)/$*.Td
@@ -132,7 +133,10 @@ INCLUDES := \
 -I$(MAKEFILE_DIR)/downloads/eigen-eigen-$(EIGEN_VERSION) \
 -I$(PROTOGENDIR) \
 -I$(PBTGENDIR) \
--I./bazel-genfiles/
+-I./bazel-genfiles/ \
+-I./bazel-tensorflow-final/external/png_archive/ \
+-I./bazel-tensorflow-final/external/jpeg_archive/ \
+-I./bazel-tensorflow-final/external/gif_archive/
 ifeq ($(HAS_GEN_HOST_PROTOC),true)
 	INCLUDES += -I$(MAKEFILE_DIR)/gen/protobuf-host/include
 endif
@@ -193,8 +197,53 @@ $(wildcard tensorflow/core/lib/*/*.cc) \
 $(wildcard tensorflow/core/platform/*.cc) \
 $(wildcard tensorflow/core/platform/*/*.cc) \
 $(wildcard tensorflow/core/util/*.cc) \
-$(wildcard tensorflow/core/util/*/*.cc)
+$(wildcard tensorflow/core/util/*/*.cc) \
+$(wildcard tensorflow/core/kernels/*.cc) \
+$(wildcard tensorflow/core/user_ops/*.cc) \
+$(wildcard tensorflow/cc/framework/*.cc) \
+$(wildcard tensorflow/cc/ops/*.cc) \
+$(wildcard bazel-genfiles/tensorflow/cc/ops/*.cc) \
+$(wildcard bazel-genfiles/tensorflow/core/kernels/*.cc)
+
+CORE_C_ALL_SRCS := \
+$(wildcard bazel-tensorflow-final/external/gif_archive/giflib-5.1.4/lib/*.c) \
+$(wildcard bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/*.c) \
+$(wildcard bazel-tensorflow-final/external/png_archive/libpng-1.2.53/*.c)
+
+CORE_C_EXCLUDE_SRCS := \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemdos.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemmac.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemansi.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemname.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/cjpeg.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/djpeg.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jpegtran.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/rdjpgcom.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/wrjpgcom.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/ckconfig.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/example.c \
+$(wildcard bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/*test.c) \
+bazel-tensorflow-final/external/png_archive/libpng-1.2.53/pngtest.c \
+
+## NB: To get that last line to work you need to run Bazel for the label_images
+
 CORE_CC_EXCLUDE_SRCS := \
+$(wildcard tensorflow/cc/framework/*test.cc) \
+$(wildcard tensorflow/cc/framework/*main.cc) \
+$(wildcard tensorflow/cc/ops/*test.cc) \
+$(wildcard tensorflow/cc/ops/*main.cc) \
+$(wildcard tensorflow/core/kernels/*test.cc) \
+$(wildcard tensorflow/core/kernels/*main.cc) \
+tensorflow/core/kernels/conv_grad_ops_3d.cc \
+tensorflow/core/kernels/debug_ops.cc \
+tensorflow/core/kernels/sparse_tensor_dense_matmul_op.cc \
+tensorflow/core/kernels/string_to_hash_bucket_op.cc \
+$(wildcard tensorflow/core/kernels/batch_matrix_*_op.cc) \
+tensorflow/core/kernels/draw_bounding_box_op.cc \
+tensorflow/core/kernels/resize_area_op.cc \
+tensorflow/core/kernels/resize_bicubic_op.cc \
+tensorflow/core/kernels/sparse_matmul_op.cc \
+tensorflow/core/kernels/tensor_array_ops.cc \
 $(wildcard tensorflow/core/*/*test.cc) \
 $(wildcard tensorflow/core/*/*testutil*) \
 $(wildcard tensorflow/core/*/*testlib*) \
@@ -204,9 +253,6 @@ $(wildcard tensorflow/core/*/*/*testutil*) \
 $(wildcard tensorflow/core/*/*/*testlib*) \
 $(wildcard tensorflow/core/*/*/*main.cc) \
 $(wildcard tensorflow/core/graph/dot.*) \
-$(wildcard tensorflow/core/lib/gif/*) \
-$(wildcard tensorflow/core/lib/jpeg/*) \
-$(wildcard tensorflow/core/lib/png/*) \
 $(wildcard tensorflow/core/util/events_writer.*) \
 $(wildcard tensorflow/core/util/reporter.*) \
 $(wildcard tensorflow/core/platform/default/stream_executor.*) \
@@ -224,8 +270,10 @@ $(wildcard tensorflow/core/common_runtime/gpu_device_factory.*)
 TF_CC_SRCS := $(filter-out $(CORE_CC_EXCLUDE_SRCS), $(CORE_CC_ALL_SRCS))
 # Add in any extra files that don't fit the patterns easily
 TF_CC_SRCS += tensorflow/core/common_runtime/gpu/gpu_tracer.cc
+TF_C_SRCS := $(filter-out $(CORE_C_EXCLUDE_SRCS), $(CORE_C_ALL_SRCS))
 # Also include the op and kernel definitions.
 TF_CC_SRCS += $(shell cat $(MAKEFILE_DIR)/tf_op_files.txt)
+TF_CC_SRCS := $(sort $(TF_CC_SRCS))
 PBT_CC_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_pb_text_files.txt)
 PROTO_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_proto_files.txt)
 BENCHMARK_SRCS := \
@@ -237,6 +285,7 @@ $(MAKEFILE_DIR)/labeler/main.cc \
 
 # File names of the intermediate files target compilation generates.
 TF_CC_OBJS := $(addprefix $(OBJDIR), $(TF_CC_SRCS:.cc=.o))
+TF_CC_OBJS += $(addprefix $(OBJDIR), $(TF_C_SRCS:.c=.o))
 PBT_GEN_FILES := $(addprefix $(PBTGENDIR), $(PBT_CC_SRCS))
 PBT_OBJS := $(addprefix $(OBJDIR), $(PBT_CC_SRCS:.cc=.o))
 PROTO_CC_SRCS := $(addprefix $(PROTOGENDIR), $(PROTO_SRCS:.proto=.pb.cc))
@@ -277,6 +326,12 @@ $(OBJDIR)%.o: %.cc | $(PBT_GEN_FILES)
 	@mkdir -p $(dir $@)
 	@mkdir -p $(dir $(DEPDIR)$*)
 	$(CXX) $(CXXFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
+	@mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d
+
+$(OBJDIR)%.o: %.c | $(PBT_GEN_FILES)
+	@mkdir -p $(dir $@)
+	@mkdir -p $(dir $(DEPDIR)$*)
+	$(CXX) $(CFLAGS) $(OPTFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 	@mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d
 
 # Compiles C++ source files that have been generated by protoc.

@@ -47,3 +47,7 @@ grep -E "//tensorflow/.*\.h$" | \
 sed -E 's#^//##g' | \
 sed -E 's#:#/#g' \
 > tensorflow/contrib/makefile/proto_text_pb_h_files.txt
+
+# Need to generate /bazel-genfiles/tensorflow/cc/* to compile the image label script
+bazel build "//tensorflow/cc:cc_ops"
+bazel build "//tensorflow/core:framework_internal"

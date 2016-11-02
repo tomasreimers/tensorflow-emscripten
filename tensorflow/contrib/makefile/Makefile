@@ -128,7 +128,11 @@ INCLUDES := \
 -I$(MAKEFILE_DIR)/downloads/ \
 -I$(MAKEFILE_DIR)/downloads/eigen-eigen-$(EIGEN_VERSION) \
 -I$(PROTOGENDIR) \
--I$(PBTGENDIR)
+-I$(PBTGENDIR) \
+-I./bazel-genfiles/ \
+-I./bazel-tensorflow-final/external/png_archive/ \
+-I./bazel-tensorflow-final/external/jpeg_archive/ \
+-I./bazel-tensorflow-final/external/gif_archive/
 ifeq ($(HAS_GEN_HOST_PROTOC),true)
 	INCLUDES += -I$(MAKEFILE_DIR)/gen/protobuf-host/include
 endif
@@ -365,6 +369,7 @@ LIB_PATH := $(LIBDIR)$(LIB_NAME)
 
 # A small example program that shows how to link against the library.
 BENCHMARK_NAME := $(BINDIR)benchmark
+LABELER_NAME := $(BINDIR)labeler
 
 # What sources we want to compile, derived from the main Bazel build using the
 # gen_file_lists.sh script.
@@ -379,8 +384,45 @@ $(wildcard tensorflow/core/lib/*/*.cc) \
 $(wildcard tensorflow/core/platform/*.cc) \
 $(wildcard tensorflow/core/platform/*/*.cc) \
 $(wildcard tensorflow/core/util/*.cc) \
-$(wildcard tensorflow/core/util/*/*.cc)
+$(wildcard tensorflow/core/util/*/*.cc) \
+$(wildcard tensorflow/core/kernels/*.cc) \
+$(wildcard tensorflow/core/user_ops/*.cc) \
+$(wildcard tensorflow/cc/framework/*.cc) \
+$(wildcard tensorflow/cc/ops/*.cc) \
+$(wildcard bazel-genfiles/tensorflow/cc/ops/*.cc) \
+$(wildcard bazel-genfiles/tensorflow/core/kernels/*.cc)
+
+CORE_C_ALL_SRCS := \
+$(wildcard bazel-tensorflow-final/external/gif_archive/giflib-5.1.4/lib/*.c) \
+$(wildcard bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/*.c) \
+$(wildcard bazel-tensorflow-final/external/png_archive/libpng-1.2.53/*.c)
+
+CORE_C_EXCLUDE_SRCS := \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemdos.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemmac.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemansi.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemname.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/cjpeg.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/djpeg.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jpegtran.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/rdjpgcom.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/wrjpgcom.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/ckconfig.c \
+bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/example.c \
+$(wildcard bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/*test.c) \
+bazel-tensorflow-final/external/png_archive/libpng-1.2.53/pngtest.c \
+
 CORE_CC_EXCLUDE_SRCS := \
+$(wildcard tensorflow/cc/framework/*test.cc) \
+$(wildcard tensorflow/cc/framework/*main.cc) \
+$(wildcard tensorflow/cc/ops/*test.cc) \
+$(wildcard tensorflow/cc/ops/*main.cc) \
+$(wildcard tensorflow/core/kernels/*test.cc) \
+$(wildcard tensorflow/core/kernels/*main.cc) \
+tensorflow/core/kernels/conv_grad_ops_3d.cc \
+tensorflow/core/kernels/debug_ops.cc \
+tensorflow/core/kernels/sparse_tensor_dense_matmul_op.cc \
+tensorflow/core/kernels/string_to_hash_bucket_op.cc \
 $(wildcard tensorflow/core/*/*test.cc) \
 $(wildcard tensorflow/core/*/*testutil*) \
 $(wildcard tensorflow/core/*/*testlib*) \
@@ -390,9 +432,6 @@ $(wildcard tensorflow/core/*/*/*testutil*) \
 $(wildcard tensorflow/core/*/*/*testlib*) \
 $(wildcard tensorflow/core/*/*/*main.cc) \
 $(wildcard tensorflow/core/graph/dot.*) \
-$(wildcard tensorflow/core/lib/gif/*) \
-$(wildcard tensorflow/core/lib/jpeg/*) \
-$(wildcard tensorflow/core/lib/png/*) \
 $(wildcard tensorflow/core/util/events_writer.*) \
 $(wildcard tensorflow/core/util/reporter.*) \
 $(wildcard tensorflow/core/platform/default/stream_executor.*) \
@@ -408,30 +447,36 @@ $(wildcard tensorflow/core/common_runtime/gpu/*) \
 $(wildcard tensorflow/core/common_runtime/gpu_device_factory.*)
 # Filter out all the excluded files.
 TF_CC_SRCS := $(filter-out $(CORE_CC_EXCLUDE_SRCS), $(CORE_CC_ALL_SRCS))
+TF_C_SRCS := $(filter-out $(CORE_C_EXCLUDE_SRCS), $(CORE_C_ALL_SRCS))
 # Add in any extra files that don't fit the patterns easily
 TF_CC_SRCS += tensorflow/core/common_runtime/gpu/gpu_tracer.cc
 # Also include the op and kernel definitions.
 TF_CC_SRCS += $(shell cat $(MAKEFILE_DIR)/tf_op_files.txt)
+TF_CC_SRCS := $(sort $(TF_CC_SRCS))
 PBT_CC_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_pb_text_files.txt)
 PROTO_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_proto_files.txt)
 BENCHMARK_SRCS := \
 tensorflow/core/util/reporter.cc \
 tensorflow/tools/benchmark/benchmark_model.cc \
 tensorflow/tools/benchmark/benchmark_model_main.cc
+LABELER_SRCS := \
+tensorflow/examples/label_image/main.cc
 
 # File names of the intermediate files target compilation generates.
 TF_CC_OBJS := $(addprefix $(OBJDIR), $(TF_CC_SRCS:.cc=.o))
+TF_CC_OBJS += $(addprefix $(OBJDIR), $(TF_C_SRCS:.c=.o))
 PBT_GEN_FILES := $(addprefix $(PBTGENDIR), $(PBT_CC_SRCS))
 PBT_OBJS := $(addprefix $(OBJDIR), $(PBT_CC_SRCS:.cc=.o))
 PROTO_CC_SRCS := $(addprefix $(PROTOGENDIR), $(PROTO_SRCS:.proto=.pb.cc))
 PROTO_OBJS := $(addprefix $(OBJDIR), $(PROTO_SRCS:.proto=.pb.o))
 LIB_OBJS := $(PROTO_OBJS) $(TF_CC_OBJS) $(PBT_OBJS)
 BENCHMARK_OBJS := $(addprefix $(OBJDIR), $(BENCHMARK_SRCS:.cc=.o))
+LABELER_OBJS := $(addprefix $(OBJDIR), $(LABELER_SRCS:.cc=.o))
 
 .PHONY: clean cleantarget
 
 # The target that's compiled if there's no command-line arguments.
-all: $(LIB_PATH) $(BENCHMARK_NAME)
+all: $(LIB_PATH) $(BENCHMARK_NAME) $(LABELER_NAME)
 
 # Rules for target compilation.
 
@@ -444,7 +489,13 @@ $(BENCHMARK_NAME): $(BENCHMARK_OBJS) $(LIB_PATH)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) \
 	-o $(BENCHMARK_NAME) $(BENCHMARK_OBJS) \
-	$(LIBFLAGS) $(LIB_PATH) $(LDFLAGS) $(LIBS)
+	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS)
+
+$(LABELER_NAME): $(LABELER_OBJS) $(LIB_PATH)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) \
+	-o $(LABELER_NAME) $(LABELER_OBJS) \
+	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS)
 
 # Matches on the normal hand-written TensorFlow C++ source files.
 $(OBJDIR)%.o: %.cc | $(PBT_GEN_FILES)
@@ -452,6 +503,13 @@ $(OBJDIR)%.o: %.cc | $(PBT_GEN_FILES)
 	@mkdir -p $(dir $(DEPDIR)$*)
 	$(CXX) $(CXXFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 	@mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d
+
+$(OBJDIR)%.o: %.c | $(PBT_GEN_FILES)
+	@mkdir -p $(dir $@)
+	@mkdir -p $(dir $(DEPDIR)$*)
+	$(CXX) $(OPTFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
+	@mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d
+
 
 # Compiles C++ source files that have been generated by protoc.
 $(OBJDIR)%.pb.o: $(PROTOGENDIR)%.pb.cc
