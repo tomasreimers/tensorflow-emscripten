@@ -117,8 +117,8 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 
 # Settings for the target compiler.
 CXX := $(CC_PREFIX) gcc
-OPTFLAGS := -O0
-CXXFLAGS := --std=c++11 -DIS_SLIM_BUILD $(OPTFLAGS)
+OPTFLAGS := -O2
+CXXFLAGS := --std=c++11 -D__MAKEFILE_JS__ -DIS_SLIM_BUILD $(OPTFLAGS)
 LDFLAGS := \
 -L/usr/local/lib
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td

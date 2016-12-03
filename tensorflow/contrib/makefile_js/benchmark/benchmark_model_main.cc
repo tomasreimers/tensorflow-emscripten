@@ -17,11 +17,13 @@ limitations under the License.
 #include "tensorflow/tools/benchmark/benchmark_model.h"
 
 int main(int argc, char** argv) {
-  // mount the directory so we can compile into JS
-  EM_ASM(
-    FS.mkdir('/working');
-    FS.mount(NODEFS, { root: '/' }, '/working');
-  );
+  #ifndef __MAKEFILE_JS_MAKE_HTML__
+    // mount the directory so we can compile into JS
+    EM_ASM(
+      FS.mkdir('/working');
+      FS.mount(NODEFS, { root: '/' }, '/working');
+    );
+  #endif
 
   return tensorflow::benchmark_model::Main(argc, argv);
 }

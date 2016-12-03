@@ -228,11 +228,13 @@ Status CheckTopLabel(const std::vector<Tensor>& outputs, int expected,
 }
 
 int main(int argc, char* argv[]) {
-  // mount the directory so we can compile into JS
-  EM_ASM(
-    FS.mkdir('/working');
-    FS.mount(NODEFS, { root: '/' }, '/working');
-  );
+  #ifndef __MAKEFILE_JS_MAKE_HTML__
+    // mount the directory so we can compile into JS
+    EM_ASM(
+      FS.mkdir('/working');
+      FS.mount(NODEFS, { root: '/' }, '/working');
+    );
+  #endif
 
   // These are the command-line flags the program can understand.
   // They define where the graph and input data is located, and what kind of

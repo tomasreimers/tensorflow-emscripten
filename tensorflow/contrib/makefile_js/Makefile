@@ -1,23 +1,12 @@
-# This Makefile compiles a library containing the C++ runtime for the TensorFlow
-# library. It's designed for use on platforms with limited resources where
-# running a full Bazel build would be prohibitive, or for cross-compilation onto
-# embedded systems. It includes only a bare-bones set of functionality.
-#
-# The default setup below is aimed at Unix-like devices, and should work on
-# modern Linux and OS X distributions without changes.
-#
-# If you have another platform, you'll need to take a careful look at the
-# compiler flags and folders defined below. They're separated into two sections,
-# the first for the host (the machine you're compiling on) and the second for
-# the target (the machine you want the program to run on).
-
-# Host compilation settings
+# Config
+ALLOCATE_MEM_UPFRONT := false
+FINAL_PRODUCT_HTML := true
 
 # Find where we're running from, so we can store generated files here.
 MAKEFILE_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-HAS_GEN_HOST_PROTOC := \
-$(shell test -f $(MAKEFILE_DIR)/gen/protobuf-host/bin/protoc && echo "true" ||\
-echo "false")
+HAS_GEN_HOST_PROTOC := $(shell test -f $(MAKEFILE_DIR)/gen/protobuf-host/bin/protoc && echo "true" || echo "false")
+
+# Host compilation settings
 
 # Try to figure out the host system
 HOST_OS :=
@@ -120,8 +109,21 @@ CXX := $(CC_PREFIX) emcc
 OPTFLAGS := -O2
 # if you'll need an arbitrary amount of memory, use -s ALLOW_MEMORY_GROWTH=1
 CFLAGS := -m64 \
--s USE_ZLIB=1 -s DEMANGLE_SUPPORT=1 -s ALLOW_MEMORY_GROWTH=1 -s ASSERTIONS=1 -s PTHREAD_HINT_NUM_CORES=1 \
+-s USE_ZLIB=1 -s DEMANGLE_SUPPORT=1 -s ASSERTIONS=1 \
 -DIS_SLIM_BUILD -D__MAKEFILE_JS__ $(OPTFLAGS)
+
+ifeq ($(FINAL_PRODUCT_HTML), true)
+	CFLAGS += --emrun
+	CFLAGS += --preload-file js-working-dir@/
+	CFLAGS += -D__MAKEFILE_JS_MAKE_HTML__
+endif
+
+ifeq ($(ALLOCATE_MEM_UPFRONT),true)
+	CFLAGS += -s TOTAL_MEMORY=536870912
+else
+	CFLAGS += -s ALLOW_MEMORY_GROWTH=1
+endif
+
 CXXFLAGS := --std=c++11 $(CFLAGS)
 LDFLAGS := \
 -L/usr/local/lib
@@ -137,9 +139,11 @@ INCLUDES := \
 -I./bazel-tensorflow-final/external/png_archive/ \
 -I./bazel-tensorflow-final/external/jpeg_archive/ \
 -I./bazel-tensorflow-final/external/gif_archive/
+
 ifeq ($(HAS_GEN_HOST_PROTOC),true)
 	INCLUDES += -I$(MAKEFILE_DIR)/gen/protobuf-host/include
 endif
+
 # This is at the end so any globally-installed frameworks like protobuf don't
 # override local versions in the source tree.
 INCLUDES += -I/usr/local/include
@@ -181,8 +185,13 @@ LIB_NAME := libtensorflow-core.a
 LIB_PATH := $(LIBDIR)$(LIB_NAME)
 
 # A small example program that shows how to link against the library.
-BENCHMARK_NAME := $(BINDIR)benchmark.js
-LABELER_NAME := $(BINDIR)labeler.js
+FINAL_EXTENSION := .js
+ifeq ($(FINAL_PRODUCT_HTML),true)
+	FINAL_EXTENSION := .html
+endif
+
+BENCHMARK_NAME := $(BINDIR)benchmark$(FINAL_EXTENSION)
+LABELER_NAME := $(BINDIR)labeler$(FINAL_EXTENSION)
 
 # What sources we want to compile, derived from the main Bazel build using the
 # gen_file_lists.sh script.
@@ -266,11 +275,14 @@ $(wildcard tensorflow/core/platform/stream_executor.*) \
 $(wildcard tensorflow/core/user_ops/*.cu.cc) \
 $(wildcard tensorflow/core/common_runtime/gpu/*) \
 $(wildcard tensorflow/core/common_runtime/gpu_device_factory.*)
+
 # Filter out all the excluded files.
 TF_CC_SRCS := $(filter-out $(CORE_CC_EXCLUDE_SRCS), $(CORE_CC_ALL_SRCS))
+
 # Add in any extra files that don't fit the patterns easily
 TF_CC_SRCS += tensorflow/core/common_runtime/gpu/gpu_tracer.cc
 TF_C_SRCS := $(filter-out $(CORE_C_EXCLUDE_SRCS), $(CORE_C_ALL_SRCS))
+
 # Also include the op and kernel definitions.
 TF_CC_SRCS += $(shell cat $(MAKEFILE_DIR)/tf_op_files.txt)
 TF_CC_SRCS := $(sort $(TF_CC_SRCS))
@@ -301,7 +313,7 @@ all: $(LIB_PATH) $(BENCHMARK_NAME) $(LABELER_NAME)
 
 # Rules for target compilation.
 
-# Gathers together all the objects we've compiled into a single '.a' archive.
+# Gathers together all the objects we've compiled into a single '.a' archive. -- Not necessary because compile data in ourselves
 $(LIB_PATH): $(LIB_OBJS)
 	@mkdir -p $(dir $@)
 	$(AR) $(ARFLAGS) $(LIB_PATH) $(LIB_OBJS)
@@ -328,7 +340,7 @@ $(OBJDIR)%.o: %.cc | $(PBT_GEN_FILES)
 	$(CXX) $(CXXFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 	@mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d
 
-$(OBJDIR)%.o: %.c | $(PBT_GEN_FILES)
+$(OBJDIR)%.o: %.c
 	@mkdir -p $(dir $@)
 	@mkdir -p $(dir $(DEPDIR)$*)
 	$(CXX) $(CFLAGS) $(OPTFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
