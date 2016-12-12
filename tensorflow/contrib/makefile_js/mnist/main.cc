@@ -98,7 +98,7 @@ Status ReadTensorFromImageFile(string file_name, const int input_height,
   string output_name = "normalized";
   auto file_reader = ReadFile(root.WithOpName(input_name), file_name);
   // Now try to figure out what kind of file it is and decode it.
-  const int wanted_channels = 3;
+  const int wanted_channels = 1;
   Output image_reader;
   if (tensorflow::StringPiece(file_name).ends_with(".png")) {
     image_reader = DecodePng(root.WithOpName("png_reader"), file_reader,
@@ -186,17 +186,8 @@ Status GetTopLabels(const std::vector<Tensor>& outputs, int how_many_labels,
 
 // Given the output of a model run, and the name of a file containing the labels
 // this prints out the top five highest-scoring values.
-Status PrintTopLabels(const std::vector<Tensor>& outputs,
-                      string labels_file_name) {
-  std::vector<string> labels;
-  size_t label_count;
-  Status read_labels_status =
-      ReadLabelsFile(labels_file_name, &labels, &label_count);
-  if (!read_labels_status.ok()) {
-    LOG(ERROR) << read_labels_status;
-    return read_labels_status;
-  }
-  const int how_many_labels = std::min(5, static_cast<int>(label_count));
+Status PrintTopLabels(const std::vector<Tensor>& outputs) {
+  const int how_many_labels = 3;
   Tensor indices;
   Tensor scores;
   TF_RETURN_IF_ERROR(GetTopLabels(outputs, how_many_labels, &indices, &scores));
@@ -205,27 +196,7 @@ Status PrintTopLabels(const std::vector<Tensor>& outputs,
   for (int pos = 0; pos < how_many_labels; ++pos) {
     const int label_index = indices_flat(pos);
     const float score = scores_flat(pos);
-    LOG(INFO) << labels[label_index] << " (" << label_index << "): " << score;
-  }
-  return Status::OK();
-}
-
-// This is a testing function that returns whether the top label index is the
-// one that's expected.
-Status CheckTopLabel(const std::vector<Tensor>& outputs, int expected,
-                     bool* is_expected) {
-  *is_expected = false;
-  Tensor indices;
-  Tensor scores;
-  const int how_many_labels = 1;
-  TF_RETURN_IF_ERROR(GetTopLabels(outputs, how_many_labels, &indices, &scores));
-  tensorflow::TTypes<int32>::Flat indices_flat = indices.flat<int32>();
-  if (indices_flat(0) != expected) {
-    LOG(ERROR) << "Expected label #" << expected << " but got #"
-               << indices_flat(0);
-    *is_expected = false;
-  } else {
-    *is_expected = true;
+    LOG(INFO) << label_index << ": " << score;
   }
   return Status::OK();
 }
@@ -250,28 +221,20 @@ int main(int argc, char* argv[]) {
   string graph =
       "tensorflow/examples/label_image/data/"
       "tensorflow_inception_graph.pb";
-  string labels =
-      "tensorflow/examples/label_image/data/"
-      "imagenet_comp_graph_label_strings.txt";
-  int32 input_width = 299;
-  int32 input_height = 299;
-  int32 input_mean = 128;
-  int32 input_std = 128;
-  string input_layer = "Mul";
-  string output_layer = "softmax";
-  bool self_test = false;
+  int32 input_width = 28;
+  int32 input_height = 28;
+  float input_mean = 0;
+  float input_std = 255;
+  string input_layer = "start_conv";
+  string output_layer = "prediction_onehot";
   string root_dir = "";
   const bool parse_result = tensorflow::ParseFlags(
       &argc, argv, {Flag("image", &image),                //
                     Flag("graph", &graph),                //
-                    Flag("labels", &labels),              //
                     Flag("input_width", &input_width),    //
                     Flag("input_height", &input_height),  //
-                    Flag("input_mean", &input_mean),      //
-                    Flag("input_std", &input_std),        //
                     Flag("input_layer", &input_layer),    //
                     Flag("output_layer", &output_layer),  //
-                    Flag("self_test", &self_test),        //
                     Flag("root_dir", &root_dir)});
   if (!parse_result) {
     LOG(ERROR) << "Error parsing command-line flags.";
@@ -309,8 +272,11 @@ int main(int argc, char* argv[]) {
 
   // Actually run the image through the model.
   std::vector<Tensor> outputs;
+  Tensor dropout(tensorflow::DT_FLOAT, tensorflow::TensorShape({1}));
+  auto x_flat = dropout.flat<float>();
+  x_flat.setConstant(1.0);
   clock_gettime(CLOCK_REALTIME, &prof_graph_start);
-  Status run_status = session->Run({{input_layer, resized_tensor}},
+  Status run_status = session->Run({{input_layer, resized_tensor}, {"dropout", dropout}},
                                    {output_layer}, {}, &outputs);
   clock_gettime(CLOCK_REALTIME, &prof_graph_end);
   if (!run_status.ok()) {
@@ -318,24 +284,8 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  // This is for automated testing to make sure we get the expected result with
-  // the default settings. We know that label 866 (military uniform) should be
-  // the top label for the Admiral Hopper image.
-  if (self_test) {
-    bool expected_matches;
-    Status check_status = CheckTopLabel(outputs, 866, &expected_matches);
-    if (!check_status.ok()) {
-      LOG(ERROR) << "Running check failed: " << check_status;
-      return -1;
-    }
-    if (!expected_matches) {
-      LOG(ERROR) << "Self-test failed!";
-      return -1;
-    }
-  }
-
   // Do something interesting with the results we've generated.
-  Status print_status = PrintTopLabels(outputs, labels);
+  Status print_status = PrintTopLabels(outputs);
   if (!print_status.ok()) {
     LOG(ERROR) << "Running print failed: " << print_status;
     return -1;

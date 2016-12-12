@@ -115,7 +115,7 @@ ThreadPool::~ThreadPool() {}
 
 void ThreadPool::Schedule(std::function<void()> fn) {
   CHECK(fn != nullptr);
-  #if defined(__MAKEFILE_JS__)
+  #if defined(__SINGLE_THREAD__)
     fn();
   #else
     impl_->Schedule(std::move(fn));

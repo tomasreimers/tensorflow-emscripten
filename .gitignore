@@ -19,3 +19,5 @@ node_modules
 *.pyc
 __pycache__
 *.swp
+/tensorflow/contrib/makefile_js/js-working-dir
+/tensorflow/contrib/makefile_js/js-working-dir.zip

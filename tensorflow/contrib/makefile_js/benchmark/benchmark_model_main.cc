@@ -13,11 +13,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#ifdef __MAKEFILE_JS__
 #include <emscripten.h>
+#endif
+
 #include "tensorflow/tools/benchmark/benchmark_model.h"
 
 int main(int argc, char** argv) {
-  #ifndef __MAKEFILE_JS_MAKE_HTML__
+   #if defined(__MAKEFILE_JS__) && !defined(__MAKEFILE_JS_MAKE_HTML__)
     // mount the directory so we can compile into JS
     EM_ASM(
       FS.mkdir('/working');

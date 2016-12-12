@@ -1,6 +1,15 @@
 # Config
-ALLOCATE_MEM_UPFRONT := false
-FINAL_PRODUCT_HTML := true
+# one of: html, js, c
+FINAL_PRODUCT := html
+ALLOCATE_MEM_UPFRONT := true
+SINGLE_THREAD := true
+
+# verify consistency
+ifneq (,$(filter $(FINAL_PRODUCT),html js))
+ifneq ($(SINGLE_THREAD),true)
+$(error Must be single threaded to compile to HTML or JS)
+endif
+endif
 
 # Find where we're running from, so we can store generated files here.
 MAKEFILE_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
@@ -106,22 +115,31 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 
 # Settings for the target compiler.
 CXX := $(CC_PREFIX) emcc
-OPTFLAGS := -O2
-# if you'll need an arbitrary amount of memory, use -s ALLOW_MEMORY_GROWTH=1
-CFLAGS := -m64 \
--s USE_ZLIB=1 -s DEMANGLE_SUPPORT=1 -s ASSERTIONS=1 \
--DIS_SLIM_BUILD -D__MAKEFILE_JS__ $(OPTFLAGS)
-
-ifeq ($(FINAL_PRODUCT_HTML), true)
-	CFLAGS += --emrun
-	CFLAGS += --preload-file js-working-dir@/
-	CFLAGS += -D__MAKEFILE_JS_MAKE_HTML__
+ifeq ($(FINAL_PRODUCT),c)
+  CXX := $(CC_PREFIX) gcc
 endif
 
-ifeq ($(ALLOCATE_MEM_UPFRONT),true)
-	CFLAGS += -s TOTAL_MEMORY=536870912
-else
-	CFLAGS += -s ALLOW_MEMORY_GROWTH=1
+OPTFLAGS := -O2
+# if you'll need an arbitrary amount of memory, use -s ALLOW_MEMORY_GROWTH=1
+CFLAGS := -m64 -DIS_SLIM_BUILD $(OPTFLAGS)
+
+ifeq ($(SINGLE_THREAD),true)
+	CFLAGS += -D__SINGLE_THREAD__
+endif
+
+ifneq (,$(filter $(FINAL_PRODUCT),html js))
+  CFLAGS += -D__MAKEFILE_JS__ -s USE_ZLIB=1 -s DEMANGLE_SUPPORT=1 -s ASSERTIONS=1
+	ifeq ($(ALLOCATE_MEM_UPFRONT),true)
+		CFLAGS += -s TOTAL_MEMORY=1073741824
+	else
+		CFLAGS += -s ALLOW_MEMORY_GROWTH=1
+	endif
+endif
+
+ifeq ($(FINAL_PRODUCT),html)
+	CFLAGS += --emrun
+	CFLAGS += --preload-file $(MAKEFILE_DIR)/js-working-dir@/
+	CFLAGS += -D__MAKEFILE_JS_MAKE_HTML__
 endif
 
 CXXFLAGS := --std=c++11 $(CFLAGS)
@@ -151,6 +169,12 @@ INCLUDES += -I/usr/local/include
 LIBS := \
 -lstdc++ \
 -lm
+
+ifeq ($(FINAL_PRODUCT), c)
+LIBS += \
+-lprotobuf \
+-lz
+endif
 
 ifeq ($(HAS_GEN_HOST_PROTOC),true)
 	PROTOC := $(MAKEFILE_DIR)/gen/protobuf-host/bin/protoc
@@ -186,12 +210,16 @@ LIB_PATH := $(LIBDIR)$(LIB_NAME)
 
 # A small example program that shows how to link against the library.
 FINAL_EXTENSION := .js
-ifeq ($(FINAL_PRODUCT_HTML),true)
+ifeq ($(FINAL_PRODUCT),html)
 	FINAL_EXTENSION := .html
+endif
+ifeq ($(FINAL_PRODUCT),c)
+	FINAL_EXTENSION := .o
 endif
 
 BENCHMARK_NAME := $(BINDIR)benchmark$(FINAL_EXTENSION)
 LABELER_NAME := $(BINDIR)labeler$(FINAL_EXTENSION)
+MNIST_NAME := $(BINDIR)mnist$(FINAL_EXTENSION)
 
 # What sources we want to compile, derived from the main Bazel build using the
 # gen_file_lists.sh script.
@@ -293,7 +321,9 @@ tensorflow/core/util/reporter.cc \
 $(MAKEFILE_DIR)/benchmark/benchmark_model.cc \
 $(MAKEFILE_DIR)/benchmark/benchmark_model_main.cc
 LABELER_SRCS := \
-$(MAKEFILE_DIR)/labeler/main.cc \
+$(MAKEFILE_DIR)/labeler/main.cc
+MNIST_SRCS := \
+$(MAKEFILE_DIR)/mnist/main.cc
 
 # File names of the intermediate files target compilation generates.
 TF_CC_OBJS := $(addprefix $(OBJDIR), $(TF_CC_SRCS:.cc=.o))
@@ -305,11 +335,17 @@ PROTO_OBJS := $(addprefix $(OBJDIR), $(PROTO_SRCS:.proto=.pb.o))
 LIB_OBJS := $(PROTO_OBJS) $(TF_CC_OBJS) $(PBT_OBJS)
 BENCHMARK_OBJS := $(addprefix $(OBJDIR), $(BENCHMARK_SRCS:.cc=.o))
 LABELER_OBJS := $(addprefix $(OBJDIR), $(LABELER_SRCS:.cc=.o))
+MNIST_OBJS := $(addprefix $(OBJDIR), $(MNIST_SRCS:.cc=.o))
+PROTOBUF_LIB := $(MAKEFILE_DIR)/downloads/protobuf-emscripten/src/.libs/libprotobuf.a
+
+ifeq ($(FINAL_PRODUCT),c)
+	PROTOBUF_LIB :=
+endif
 
 .PHONY: clean cleantarget
 
 # The target that's compiled if there's no command-line arguments.
-all: $(LIB_PATH) $(BENCHMARK_NAME) $(LABELER_NAME)
+all: $(LIB_PATH) $(BENCHMARK_NAME) $(LABELER_NAME) $(MNIST_NAME)
 
 # Rules for target compilation.
 
@@ -323,14 +359,21 @@ $(BENCHMARK_NAME): $(BENCHMARK_OBJS) $(LIB_PATH)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) \
 	-o $(BENCHMARK_NAME) $(BENCHMARK_OBJS) \
 	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
-	$(MAKEFILE_DIR)/downloads/protobuf-emscripten/src/.libs/libprotobuf.a
+	$(PROTOBUF_LIB)
 
 $(LABELER_NAME): $(LABELER_OBJS) $(LIB_PATH)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) \
 	-o $(LABELER_NAME) $(LABELER_OBJS) \
 	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
-	$(MAKEFILE_DIR)/downloads/protobuf-emscripten/src/.libs/libprotobuf.a
+	$(PROTOBUF_LIB)
+
+$(MNIST_NAME): $(MNIST_OBJS) $(LIB_PATH)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) \
+	-o $(MNIST_NAME) $(MNIST_OBJS) \
+	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
+	$(PROTOBUF_LIB)
 
 
 # Matches on the normal hand-written TensorFlow C++ source files.
