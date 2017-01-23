@@ -1,6 +1,6 @@
 # Config
 # one of: html, js, c
-FINAL_PRODUCT := html
+FINAL_PRODUCT := js
 ALLOCATE_MEM_UPFRONT := true
 SINGLE_THREAD := true
 
@@ -220,6 +220,7 @@ endif
 BENCHMARK_NAME := $(BINDIR)benchmark$(FINAL_EXTENSION)
 LABELER_NAME := $(BINDIR)labeler$(FINAL_EXTENSION)
 MNIST_NAME := $(BINDIR)mnist$(FINAL_EXTENSION)
+GR_NAME := $(BINDIR)graph_runner$(FINAL_EXTENSION)
 
 # What sources we want to compile, derived from the main Bazel build using the
 # gen_file_lists.sh script.
@@ -320,10 +321,9 @@ BENCHMARK_SRCS := \
 tensorflow/core/util/reporter.cc \
 $(MAKEFILE_DIR)/benchmark/benchmark_model.cc \
 $(MAKEFILE_DIR)/benchmark/benchmark_model_main.cc
-LABELER_SRCS := \
-$(MAKEFILE_DIR)/labeler/main.cc
-MNIST_SRCS := \
-$(MAKEFILE_DIR)/mnist/main.cc
+LABELER_SRCS := $(MAKEFILE_DIR)/labeler/main.cc
+MNIST_SRCS := $(MAKEFILE_DIR)/mnist/main.cc
+GR_SRCS := $(MAKEFILE_DIR)/graph_runner/main.cc
 
 # File names of the intermediate files target compilation generates.
 TF_CC_OBJS := $(addprefix $(OBJDIR), $(TF_CC_SRCS:.cc=.o))
@@ -336,6 +336,7 @@ LIB_OBJS := $(PROTO_OBJS) $(TF_CC_OBJS) $(PBT_OBJS)
 BENCHMARK_OBJS := $(addprefix $(OBJDIR), $(BENCHMARK_SRCS:.cc=.o))
 LABELER_OBJS := $(addprefix $(OBJDIR), $(LABELER_SRCS:.cc=.o))
 MNIST_OBJS := $(addprefix $(OBJDIR), $(MNIST_SRCS:.cc=.o))
+GR_OBJS := $(addprefix $(OBJDIR), $(GR_SRCS:.cc=.o))
 PROTOBUF_LIB := $(MAKEFILE_DIR)/downloads/protobuf-emscripten/src/.libs/libprotobuf.a
 
 ifeq ($(FINAL_PRODUCT),c)
@@ -345,7 +346,7 @@ endif
 .PHONY: clean cleantarget
 
 # The target that's compiled if there's no command-line arguments.
-all: $(LIB_PATH) $(BENCHMARK_NAME) $(LABELER_NAME) $(MNIST_NAME)
+all: $(LIB_PATH) $(BENCHMARK_NAME) $(LABELER_NAME) $(MNIST_NAME) $(GR_NAME)
 
 # Rules for target compilation.
 
@@ -375,6 +376,17 @@ $(MNIST_NAME): $(MNIST_OBJS) $(LIB_PATH)
 	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
 	$(PROTOBUF_LIB)
 
+#
+# TODO: FIND SOMEWAY TO MAKE THE BIND FLAG MORE MEANINGFUL
+#
+
+$(GR_NAME): $(GR_OBJS) $(LIB_PATH)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) \
+	-o $(GR_NAME) $(GR_OBJS) \
+	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
+	--bind \
+	$(PROTOBUF_LIB)
 
 # Matches on the normal hand-written TensorFlow C++ source files.
 $(OBJDIR)%.o: %.cc | $(PBT_GEN_FILES)

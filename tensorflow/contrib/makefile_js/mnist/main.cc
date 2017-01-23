@@ -225,7 +225,7 @@ int main(int argc, char* argv[]) {
   int32 input_height = 28;
   float input_mean = 0;
   float input_std = 255;
-  string input_layer = "start_conv";
+  string input_layer = "Reshape";
   string output_layer = "prediction_onehot";
   string root_dir = "";
   const bool parse_result = tensorflow::ParseFlags(
