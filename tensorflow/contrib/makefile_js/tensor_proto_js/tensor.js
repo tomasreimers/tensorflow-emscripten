@@ -88,9 +88,17 @@ module.exports.make_tensor = function (arr, verify_shape = false) {
   tensor.setVersionNumber(1);
 
   if (type === pb.DataType.DT_INT32) {
-    tensor.setIntValList(_.flatten(arr));
+    if (Array.isArray(arr)) {
+      tensor.setIntValList(_.flatten(arr));
+    } else {
+      tensor.setIntValList([arr]);
+    }
   } else if (type === pb.DataType.DT_FLOAT32) {
-    tensor.setFloatValList(_.flatten(arr));
+    if (Array.isArray(arr)) {
+      tensor.setFloatValList(_.flatten(arr));
+    } else {
+      tensor.setFloatValList([arr]);
+    }
   } else {
     throw "Unsupported type";
   }
@@ -119,8 +127,8 @@ module.exports.make_array = function (tpb) {
 
       values_array = [...data];
     } else {
-      if (tensor.getIntValList().length === 1) {
-        values_array = _.fill(values_array, tensor.getIntValList()[0], 0, _.reduce(shape, _.multiply));
+      if (tensor.getIntValList().length === 1 && shape.length !== 0) {
+        values_array = _.fill(Array(_.reduce(shape, _.multiply)), tensor.getIntValList()[0]);
       } else {
         values_array = tensor.getIntValList();
       }
@@ -132,14 +140,23 @@ module.exports.make_array = function (tpb) {
 
       values_array = [...data];
     } else {
-      if (tensor.getFloatValList().length === 1) {
-        values_array = _.fill(values_array, tensor.getFloatValList()[0], 0, _.reduce(shape, _.multiply));
+      if (tensor.getFloatValList().length === 1 && shape.length !== 0) {
+        values_array = _.fill(Array(_.reduce(shape, _.multiply)), tensor.getFloatValList()[0]);
       } else {
         values_array = tensor.getFloatValList();
       }
     }
   } else {
     throw "Unknown type";
+  }
+
+  // special case scalars
+  if (shape.length === 0) {
+    if (values_array.length !== 1) {
+      throw "Expected scalar, got more than one value";
+    }
+
+    return values_array[0];
   }
 
   // resize array to appropriate size

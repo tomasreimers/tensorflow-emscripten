@@ -150,6 +150,22 @@ Tensor parseTensor(std::string tensorPB) {
   return t;
 }
 
+std::string tensorToString(Tensor t) {
+  tensorflow::TensorProto tp;
+  t.AsProtoField(&tp);
+  return tp.SerializeAsString();
+}
+
+std::vector<std::string> tensorVectorToStringVector(std::vector<Tensor> input) {
+  std::vector<std::string> output;
+
+  output.resize(input.size());
+
+  std::transform(input.begin(), input.end(), output.begin(), tensorToString);
+
+  return output;
+}
+
 void printIntTensor(std::string tensorPB) {
   Tensor t = parseTensor(tensorPB);
   LOG(INFO) << "Returned" << std::endl << t.flat<int32_t>();
@@ -165,7 +181,6 @@ std::string printDummyIntTensor(void) {
   input_flat(0) = 5;
 
   tensorflow::TensorProto tp;
-  std::string tps;
 
   input.AsProtoField(&tp);
 
@@ -204,6 +219,8 @@ EMSCRIPTEN_BINDINGS(graph_runner) {
   emscripten::class_<Tensor>("Tensor");
   emscripten::class_<std::pair<string, Tensor>>("StringTensorPair");
 
+  emscripten::function("tensorToString", &tensorToString);
+  emscripten::function("tensorVectorToStringVector", &tensorVectorToStringVector);
   emscripten::function("makeStringTensorPair", &makeStringTensorPair);
   emscripten::function("parseTensor", &parseTensor);
   emscripten::function("printIntTensor", &printIntTensor); // for debugging
@@ -211,5 +228,6 @@ EMSCRIPTEN_BINDINGS(graph_runner) {
 
   emscripten::register_map<std::string, std::string>("MapStringString");
   emscripten::register_vector<std::string>("VectorString");
+  emscripten::register_vector<Tensor>("VectorTensor");
   emscripten::register_vector<std::pair<string, Tensor>>("VectorStringTensorPair");
 }
