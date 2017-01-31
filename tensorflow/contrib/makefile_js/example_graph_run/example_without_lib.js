@@ -35,11 +35,11 @@ const sess = new graph_runner.JSSession(graph_pb);
 const inputs = [
   graph_runner.makeStringTensorPair(
     "a",
-    graph_runner.parseTensor(tensor.make_tensor([2]))
+    graph_runner.parseTensor(tensor.make_tensor(2))
   ),
   graph_runner.makeStringTensorPair(
     "b",
-    graph_runner.parseTensor(tensor.make_tensor([3]))
+    graph_runner.parseTensor(tensor.make_tensor(3))
   )
 ];
 const outputs = ["o"];
