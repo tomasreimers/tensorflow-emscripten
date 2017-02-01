@@ -1,29 +1,45 @@
 const pb = require('./gen/tensorflow/core/framework/tensor_pb.js');
-const te = require('text-encoding'); // polyfill for TextEncoder : http://stackoverflow.com/questions/8936984/uint8array-to-string-in-javascript
 const _ = require('lodash');
 
-module.exports = {};
-
-function is_int(n){
-    return Number(n) === n && n % 1 === 0;
+// Modified from: https://developers.google.com/web/updates/2012/06/How-to-convert-ArrayBuffer-to-and-from-String
+// Using this because require('text-encoding') because (at least at time of writing) encode(decode([128])) != [128] due to JS stirngs being UTF16
+function ab2str(buf) {
+  return String.fromCharCode.apply(null, new Uint8Array(buf));
+}
+function str2ab(str) {
+  var buf = new ArrayBuffer(str.length); // 2 bytes for each char
+  var bufView = new Uint8Array(buf);
+  for (var i=0, strLen=str.length; i < strLen; i++) {
+    bufView[i] = str.charCodeAt(i);
+  }
+  return bufView;
 }
 
-function is_float(n){
-    return Number(n) === n && n % 1 !== 0;
-}
+module.exports = {
+  ab2str: ab2str,
+  str2ab: str2ab
+};
 
-function extract_shape_and_type (arr, verify_shape = false) {
+const TYPES = {
+  INT: pb.DataType.DT_INT32,
+  FLOAT: pb.DataType.DT_FLOAT
+};
+
+module.exports.types = TYPES;
+
+function extract_shape (arr, do_verify_shape = false) {
   let shape = undefined;
-  let type = undefined;
 
   if (Array.isArray(arr) && arr.length !== 0) {
     // just expanding dimension
-    [shape, type] = extract_shape_and_type(arr[0], verify_shape);
+    shape = extract_shape(arr[0], do_verify_shape);
 
     // verify if we need to
-    if (verify_shape) {
+    if (do_verify_shape) {
       for (let ii = 1; ii < arr.length; ii++) {
-        verify_shape_and_type(arr[ii], shape, type)
+        if (!verify_shape(arr[ii], shape)) {
+          throw "Invalid dimension";
+        }
       }
     }
 
@@ -32,42 +48,35 @@ function extract_shape_and_type (arr, verify_shape = false) {
   } else {
     // dealing with literal
     shape = [];
-
-    if (is_int(arr)) {
-      type = pb.DataType.DT_INT32;
-    } else if (is_float(arr)) {
-      type = pb.DataType.DT_FLOAT32;
-    } else {
-      throw "Unknown type";
-    }
   }
 
-  return [shape, type];
+  return shape;
 };
 // expose via underscore for debugging
-module.exports._extract_shape_and_type = extract_shape_and_type;
+module.exports._extract_shape = extract_shape;
 
-function verify_shape_and_type (arr, shape, type) {
+function verify_shape (arr, shape) {
   if (shape.length === 0) {
-    if (type === pb.DataType.DT_INT32 && !is_int(arr)) {
-      throw "Expected int";
-    } else if (type === pb.DataType.DT_FLOAT32 && !is_float(arr)) {
-      throw "Expected float";
-    }
+    /* do nothing */
   } else {
     if (arr.length !== shape[0]) {
-      throw "Invalid dimension";
+      console.log("Expected length of " + shape[0] + ", got length of " + arr.length);
+      return false;
     }
     for (let ii = 0; ii < arr.length; ii++) {
-      verify_shape_and_type(arr[ii], _.slice(arr, 1), type);
+      if (!verify_shape(arr[ii], _.slice(shape, 1))) {
+        console.log("In Dimension " + ii);
+        return false;
+      }
     }
   }
+  return true;
 };
 
 // takes in a multidimsional array and produces stringified tensor protobuf
-module.exports.make_tensor = function (arr, verify_shape = false) {
+module.exports.make_tensor = function (arr, type = TYPES.INT, do_verify_shape = false) {
   // extract shape and type
-  [shape, type] = extract_shape_and_type(arr, verify_shape);
+  shape= extract_shape(arr, do_verify_shape);
 
   // create the protobuf
   const tensor = new pb.TensorProto();
@@ -89,13 +98,13 @@ module.exports.make_tensor = function (arr, verify_shape = false) {
 
   if (type === pb.DataType.DT_INT32) {
     if (Array.isArray(arr)) {
-      tensor.setIntValList(_.flatten(arr));
+      tensor.setIntValList(_.flattenDeep(arr));
     } else {
       tensor.setIntValList([arr]);
     }
-  } else if (type === pb.DataType.DT_FLOAT32) {
+  } else if (type === pb.DataType.DT_FLOAT) {
     if (Array.isArray(arr)) {
-      tensor.setFloatValList(_.flatten(arr));
+      tensor.setFloatValList(_.flattenDeep(arr));
     } else {
       tensor.setFloatValList([arr]);
     }
@@ -104,15 +113,17 @@ module.exports.make_tensor = function (arr, verify_shape = false) {
   }
 
   // stringify
-  const decoder = new te.TextDecoder('utf-8');
-  return decoder.decode(tensor.serializeBinary());
+  if (!_.isEqual(tensor.serializeBinary(), str2ab(ab2str(tensor.serializeBinary())))) {
+    throw "Unexpected encoding failure (does not decode to same val)";
+  }
+
+  return ab2str(tensor.serializeBinary());
 };
 
 // takes in stringifed tensor protobuf and produces a multidimsional array
 module.exports.make_array = function (tpb) {
   // get the tensor object
-  const encoder = new te.TextEncoder('utf-8');
-  const tensor = new pb.TensorProto.deserializeBinary(encoder.encode(tpb));
+  const tensor = new pb.TensorProto.deserializeBinary(str2ab(tpb));
 
   // get shape
   let shape = _.map(tensor.getTensorShape().getDimList(), (dim) => dim.getSize());
@@ -133,7 +144,7 @@ module.exports.make_array = function (tpb) {
         values_array = tensor.getIntValList();
       }
     }
-  } else if (tensor.getDtype() === pb.DataType.DT_FLOAT32) {
+  } else if (tensor.getDtype() === pb.DataType.DT_FLOAT) {
     if (tensor.getTensorContent()) {
       bytes = Uint8Array.from(tensor.getTensorContent_asU8())
       data = new Float32Array(bytes.buffer)

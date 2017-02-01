@@ -8,6 +8,9 @@ process.chdir(cwd);
 
 // NOTE: This programs leaks memory like no other... should probably fix that
 
+// figure out how to *NOT* define this upfront and force all tenosrs to be same
+const TENSOR_TYPE = tensor.types.FLOAT;
+
 // utility function
 function copy_array_to_vector(arr, vector) {
   for (var ii = 0; ii < arr.length; ii++) {
@@ -21,11 +24,14 @@ function Session (graph_pb) {
   self.run = function (inputs, outputs) {
     // encode the inputs and outputs
     const input_pairs = [];
+    const input_keys = Object.keys(inputs);
     for (let ii = 0; ii < Object.keys(inputs).length; ii++) {
       input_pairs.push(
         graph_runner.makeStringTensorPair(
-          Object.keys(inputs)[ii],
-          graph_runner.parseTensor(tensor.make_tensor(inputs[Object.keys(inputs)[ii]]))
+          input_keys[ii],
+          graph_runner.parseTensor(
+            tensor.make_tensor(inputs[input_keys[ii]], TENSOR_TYPE)
+          )
         )
       );
     }
@@ -44,19 +50,15 @@ function Session (graph_pb) {
     // decode the results
     const results = [];
     for (let ii = 0; ii < results_vector.size(); ii++) {
-      results.push(tensor.make_array(results_vector.get(ii)));
+      results.push(
+        tensor.make_array(results_vector.get(ii), TENSOR_TYPE)
+      );
     }
 
     return results;
   };
 };
 
-function run_graph (graph, inputs, outputs) {
-  const s = new Session(graph);
-  return s.run(inputs, outputs);
-}
-
 module.exports = {
-  "Session": Session,
-  "run_graph": run_graph
+  "Session": Session
 };
