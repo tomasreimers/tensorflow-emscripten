@@ -1,0 +1,25 @@
+{
+  "name": "graph_run_lib",
+  "version": "0.1.0",
+  "description": "Wrapper for emscripten-compiled tensorflow.js.",
+  "main": "lib.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "tensorflow",
+    "machine-learning",
+    "javascript"
+  ],
+  "author": "Tomas Reimers",
+  "license": "MIT",
+  "dependencies": {
+    "tensorjs": "^0.1.0"
+  },
+  "devDependencies": {
+    "canvas": "^1.6.2"
+  }
+}

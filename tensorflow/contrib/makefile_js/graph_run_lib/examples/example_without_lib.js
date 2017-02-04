@@ -1,15 +1,16 @@
-const tensor = require('../tensor_proto_js/tensor.js');
+const tensorjs = require('tensorjs');
 
 // nasty hack to get around memory initializer non-sense
 // TODO: Fix this
 let cwd = process.cwd();
-process.chdir('../gen/bin/');
-const graph_runner = require('../gen/bin/graph_runner.js');
+process.chdir('../../gen/bin/');
+const graph_runner = require('../../gen/bin/graph_runner.js');
 process.chdir(cwd);
 
 const fs = require('fs');
 
-// NOTE: This programs leaks memory like no other... should probably fix that
+// NOTE: This programs leaks memory like no other...
+//       see ../lib.js for how to fix that
 
 // utility function
 function copy_array_to_vector(arr, vector) {
@@ -19,27 +20,19 @@ function copy_array_to_vector(arr, vector) {
 }
 
 // read basic graph
-// const graph_pb = fs.readFileSync("../js-working-dir/io_graph.pb", "utf8");
-const graph_pb = fs.readFileSync("../js-working-dir/add_graph.pb", "utf8");
+const graph_pb = fs.readFileSync("../js_working_directory/add_graph.pb", "utf8");
 
 // construct session
 const sess = new graph_runner.JSSession(graph_pb);
 
-// create inputs
-// const inputs = [
-//   graph_runner.makeStringTensorPair(
-//     "i",
-//     graph_runner.parseTensor(tensor.make_tensor([4]))
-//   )
-// ];
 const inputs = [
   graph_runner.makeStringTensorPair(
     "a",
-    graph_runner.parseTensor(tensor.make_tensor(2))
+    graph_runner.parseTensor(tensorjs.make_tensor(2))
   ),
   graph_runner.makeStringTensorPair(
     "b",
-    graph_runner.parseTensor(tensor.make_tensor(3))
+    graph_runner.parseTensor(tensorjs.make_tensor(3))
   )
 ];
 const outputs = ["o"];

@@ -2,7 +2,7 @@
 pushd gen/bin/
 
 time ./mnist.o \
-  --graph=../../js-working-dir/mnist.pb \
-  --image=../../js-working-dir/mnist_data/$1.jpg
+  --graph=../../js_working_directory/mnist.pb \
+  --image=../../js_working_directory/mnist_data/$1.jpg
 
 popd

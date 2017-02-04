@@ -138,7 +138,7 @@ endif
 
 ifeq ($(FINAL_PRODUCT),html)
 	CFLAGS += --emrun
-	CFLAGS += --preload-file $(MAKEFILE_DIR)/js-working-dir@/
+	CFLAGS += --preload-file $(MAKEFILE_DIR)/js_working_directory@/
 	CFLAGS += -D__MAKEFILE_JS_MAKE_HTML__
 endif
 
@@ -319,11 +319,11 @@ PBT_CC_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_pb_text_files.txt)
 PROTO_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_proto_files.txt)
 BENCHMARK_SRCS := \
 tensorflow/core/util/reporter.cc \
-$(MAKEFILE_DIR)/benchmark/benchmark_model.cc \
-$(MAKEFILE_DIR)/benchmark/benchmark_model_main.cc
-LABELER_SRCS := $(MAKEFILE_DIR)/labeler/main.cc
-MNIST_SRCS := $(MAKEFILE_DIR)/mnist/main.cc
-GR_SRCS := $(MAKEFILE_DIR)/graph_runner/main.cc
+$(MAKEFILE_DIR)/programs/benchmark/benchmark_model.cc \
+$(MAKEFILE_DIR)/programs/benchmark/benchmark_model_main.cc
+LABELER_SRCS := $(MAKEFILE_DIR)/programs/labeler/main.cc
+MNIST_SRCS := $(MAKEFILE_DIR)/programs/mnist/main.cc
+GR_SRCS := $(MAKEFILE_DIR)/programs/graph_runner/main.cc
 
 # File names of the intermediate files target compilation generates.
 TF_CC_OBJS := $(addprefix $(OBJDIR), $(TF_CC_SRCS:.cc=.o))

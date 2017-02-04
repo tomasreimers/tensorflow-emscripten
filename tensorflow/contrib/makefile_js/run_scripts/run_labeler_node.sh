@@ -2,8 +2,8 @@
 pushd gen/bin/
 
 time node labeler.js \
-  --graph=/working/$(pwd)/../../js-working-dir/tensorflow_inception_graph.pb \
-  --image=/working/$(pwd)/../../js-working-dir/labeler_data/$1.jpg \
-  --labels=/working/$(pwd)/../../js-working-dir/imagenet_comp_graph_label_strings.txt
+  --graph=/working/$(pwd)/../../js_working_directory/tensorflow_inception_graph.pb \
+  --image=/working/$(pwd)/../../js_working_directory/labeler_data/$1.jpg \
+  --labels=/working/$(pwd)/../../js_working_directory/imagenet_comp_graph_label_strings.txt
 
 popd
