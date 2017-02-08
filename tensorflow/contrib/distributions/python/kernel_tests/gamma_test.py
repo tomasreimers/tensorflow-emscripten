@@ -134,8 +134,8 @@ class GammaTest(tf.test.TestCase):
       alpha_v = np.array([0.5, 3.0, 2.5])
       beta_v = np.array([1.0, 4.0, 5.0])
       gamma = tf.contrib.distributions.Gamma(
-          alpha=alpha_v, beta=beta_v)
-      with self.assertRaisesOpError('x < y'):
+          alpha=alpha_v, beta=beta_v, allow_nan_stats=False)
+      with self.assertRaisesOpError("x < y"):
         gamma.mode().eval()
 
   def testGammaModeAllowNanStatsIsTrueReturnsNaNforUndefinedBatchMembers(self):
@@ -177,6 +177,29 @@ class GammaTest(tf.test.TestCase):
       self.assertEqual(gamma.entropy().get_shape(), (3,))
       self.assertAllClose(gamma.entropy().eval(), expected_entropy)
 
+  def testGammaSampleSmallAlpha(self):
+    with tf.Session():
+      alpha_v = 0.05
+      beta_v = 1.0
+      alpha = tf.constant(alpha_v)
+      beta = tf.constant(beta_v)
+      n = 100000
+      gamma = tf.contrib.distributions.Gamma(alpha=alpha, beta=beta)
+      samples = gamma.sample(n, seed=137)
+      sample_values = samples.eval()
+      self.assertEqual(samples.get_shape(), (n,))
+      self.assertEqual(sample_values.shape, (n,))
+      self.assertAllClose(
+          sample_values.mean(),
+          stats.gamma.mean(
+              alpha_v, scale=1 / beta_v),
+          atol=.01)
+      self.assertAllClose(
+          sample_values.var(),
+          stats.gamma.var(alpha_v, scale=1 / beta_v),
+          atol=.15)
+      self.assertTrue(self._kstest(alpha_v, beta_v, sample_values))
+
   def testGammaSample(self):
     with tf.Session():
       alpha_v = 4.0
@@ -185,13 +208,15 @@ class GammaTest(tf.test.TestCase):
       beta = tf.constant(beta_v)
       n = 100000
       gamma = tf.contrib.distributions.Gamma(alpha=alpha, beta=beta)
-      samples = gamma.sample_n(n, seed=137)
+      samples = gamma.sample(n, seed=137)
       sample_values = samples.eval()
       self.assertEqual(samples.get_shape(), (n,))
       self.assertEqual(sample_values.shape, (n,))
-      self.assertAllClose(sample_values.mean(),
-                          stats.gamma.mean(alpha_v, scale=1 / beta_v),
-                          atol=.0011)
+      self.assertAllClose(
+          sample_values.mean(),
+          stats.gamma.mean(
+              alpha_v, scale=1 / beta_v),
+          atol=.01)
       self.assertAllClose(sample_values.var(),
                           stats.gamma.var(alpha_v, scale=1 / beta_v),
                           atol=.15)
@@ -203,7 +228,7 @@ class GammaTest(tf.test.TestCase):
       beta_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
       gamma = tf.contrib.distributions.Gamma(alpha=alpha_v, beta=beta_v)
       n = 10000
-      samples = gamma.sample_n(n, seed=137)
+      samples = gamma.sample(n, seed=137)
       sample_values = samples.eval()
       self.assertEqual(samples.get_shape(), (n, 10, 100))
       self.assertEqual(sample_values.shape, (n, 10, 100))
@@ -212,8 +237,9 @@ class GammaTest(tf.test.TestCase):
       beta_bc = beta_v + zeros
       self.assertAllClose(
           sample_values.mean(axis=0),
-          stats.gamma.mean(alpha_bc, scale=1 / beta_bc),
-          atol=.25)
+          stats.gamma.mean(
+              alpha_bc, scale=1 / beta_bc),
+          rtol=.035)
       self.assertAllClose(
           sample_values.var(axis=0),
           stats.gamma.var(alpha_bc, scale=1 / beta_bc),
@@ -237,7 +263,7 @@ class GammaTest(tf.test.TestCase):
     with tf.Session() as sess:
       gamma = tf.contrib.distributions.Gamma(alpha=[7., 11.], beta=[[5.], [6.]])
       num = 50000
-      samples = gamma.sample_n(num, seed=137)
+      samples = gamma.sample(num, seed=137)
       pdfs = gamma.pdf(samples)
       sample_vals, pdf_vals = sess.run([samples, pdfs])
       self.assertEqual(samples.get_shape(), (num, 2, 2))
@@ -269,17 +295,28 @@ class GammaTest(tf.test.TestCase):
 
   def testGammaNonPositiveInitializationParamsRaises(self):
     with self.test_session():
-      alpha_v = tf.constant(0.0, name='alpha')
-      beta_v = tf.constant(1.0, name='beta')
-      gamma = tf.contrib.distributions.Gamma(alpha=alpha_v, beta=beta_v)
-      with self.assertRaisesOpError('alpha'):
+      alpha_v = tf.constant(0.0, name="alpha")
+      beta_v = tf.constant(1.0, name="beta")
+      gamma = tf.contrib.distributions.Gamma(alpha=alpha_v, beta=beta_v,
+                                             validate_args=True)
+      with self.assertRaisesOpError("alpha"):
         gamma.mean().eval()
-      alpha_v = tf.constant(1.0, name='alpha')
-      beta_v = tf.constant(0.0, name='beta')
-      gamma = tf.contrib.distributions.Gamma(alpha=alpha_v, beta=beta_v)
-      with self.assertRaisesOpError('beta'):
+      alpha_v = tf.constant(1.0, name="alpha")
+      beta_v = tf.constant(0.0, name="beta")
+      gamma = tf.contrib.distributions.Gamma(alpha=alpha_v, beta=beta_v,
+                                             validate_args=True)
+      with self.assertRaisesOpError("beta"):
         gamma.mean().eval()
 
+  def testGammaWithSoftplusAlphaBeta(self):
+    with self.test_session():
+      alpha_v = tf.constant([0.0, -2.1], name="alpha")
+      beta_v = tf.constant([1.0, -3.6], name="beta")
+      gamma = tf.contrib.distributions.GammaWithSoftplusAlphaBeta(
+          alpha=alpha_v, beta=beta_v)
+      self.assertAllEqual(tf.nn.softplus(alpha_v).eval(), gamma.alpha.eval())
+      self.assertAllEqual(tf.nn.softplus(beta_v).eval(), gamma.beta.eval())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
   tf.test.main()

@@ -37,7 +37,7 @@ typedef Status (*GradFunc)(const Scope& scope, const Operation& op,
 class GradOpRegistry {
  public:
   // Registers 'func' as the the gradient function for 'op'.
-  // Returns true if registration was succesful, check fails otherwise.
+  // Returns true if registration was successful, check fails otherwise.
   bool Register(const string& op, GradFunc func);
 
   // Sets 'func' to the gradient function for 'op' and returns Status OK if
@@ -45,7 +45,7 @@ class GradOpRegistry {
   // Note that 'func' can be null for ops that have registered no-gradient with
   // the registry.
   // Returns error status otherwise.
-  Status Lookup(const string& op, GradFunc* func);
+  Status Lookup(const string& op, GradFunc* func) const;
 
   // Returns a pointer to the global gradient function registry.
   static GradOpRegistry* Global();

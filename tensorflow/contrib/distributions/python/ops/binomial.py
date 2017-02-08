@@ -17,10 +17,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# pylint: disable=line-too-long
-
 from tensorflow.contrib.distributions.python.ops import distribution
 from tensorflow.contrib.distributions.python.ops import distribution_util
+from tensorflow.python.framework import common_shapes
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
@@ -30,7 +29,17 @@ from tensorflow.python.ops import check_ops
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import math_ops
 
-# pylint: enable=line-too-long
+_binomial_prob_note = """
+For each batch member of counts `value`, `P[counts]` is the probability that
+after sampling `n` draws from this Binomial distribution, the number of
+successes is `k`.  Note that different sequences of draws can result in the
+same counts, thus the probability includes a combinatorial coefficient.
+
+`value` must be a non-negative tensor with dtype `dtype` and whose shape
+can be broadcast with `self.p` and `self.n`. `counts` is only legal if it is
+less than or equal to `n` and its components are equal to integer
+values.
+"""
 
 
 class Binomial(distribution.Distribution):
@@ -91,8 +100,8 @@ class Binomial(distribution.Distribution):
                n,
                logits=None,
                p=None,
-               validate_args=True,
-               allow_nan_stats=False,
+               validate_args=False,
+               allow_nan_stats=True,
                name="Binomial"):
     """Initialize a batch of Binomial distributions.
 
@@ -104,14 +113,16 @@ class Binomial(distribution.Distribution):
       logits: Floating point tensor representing the log-odds of a
         positive event with shape broadcastable to `[N1,..., Nm]` `m >= 0`, and
         the same dtype as `n`. Each entry represents logits for the probability
-        of success for independent Binomial distributions.
+        of success for independent Binomial distributions. Only one of
+        `logits` or `p` should be passed in.
       p:  Positive floating point tensor with shape broadcastable to
         `[N1,..., Nm]` `m >= 0`, `p in [0, 1]`. Each entry represents the
-        probability of success for independent Binomial distributions.
-      validate_args: Whether to assert valid values for parameters `n` and `p`,
-        and `x` in `prob` and `log_prob`.  If `False`, correct behavior is not
-        guaranteed.
-      allow_nan_stats:  Boolean, default `False`.  If `False`, raise an
+        probability of success for independent Binomial distributions. Only one
+        of `logits` or `p` should be passed in.
+      validate_args: `Boolean`, default `False`.  Whether to assert valid values
+        for parameters `n`, `p`, and `x` in `prob` and `log_prob`.
+        If `False` and inputs are invalid, correct behavior is not guaranteed.
+      allow_nan_stats: `Boolean`, default `True`.  If `False`, raise an
         exception if a statistic (e.g. mean/mode/etc...) is undefined for any
         batch member.  If `True`, batch members with valid parameters leading to
         undefined statistics will return NaN for this statistic.
@@ -128,93 +139,27 @@ class Binomial(distribution.Distribution):
     ```
 
     """
-
-    self._logits, self._p = distribution_util.get_logits_and_prob(
-        name=name, logits=logits, p=p, validate_args=validate_args)
-
-    with ops.op_scope([n], name):
+    parameters = locals()
+    parameters.pop("self")
+    with ops.name_scope(name, values=[n]) as ns:
       with ops.control_dependencies([
           check_ops.assert_non_negative(
               n, message="n has negative components."),
           distribution_util.assert_integer_form(
-              n, message="n has non-integer components."
-          )] if validate_args else []):
-        self._n = array_ops.identity(n, name="convert_n")
-
-        self._name = name
-        self._validate_args = validate_args
-        self._allow_nan_stats = allow_nan_stats
-
-        self._mean = self._n * self._p
-        self._get_batch_shape = self._mean.get_shape()
-        self._get_event_shape = tensor_shape.TensorShape([])
-
-  @property
-  def name(self):
-    """Name to prepend to all ops."""
-    return self._name
-
-  @property
-  def dtype(self):
-    """dtype of samples from this distribution."""
-    return self._p.dtype
-
-  @property
-  def validate_args(self):
-    """Boolean describing behavior on invalid input."""
-    return self._validate_args
-
-  @property
-  def allow_nan_stats(self):
-    """Boolean describing behavior when a stat is undefined for batch member."""
-    return self._allow_nan_stats
-
-  def batch_shape(self, name="batch_shape"):
-    """Batch dimensions of this instance as a 1-D int32 `Tensor`.
-
-    The product of the dimensions of the `batch_shape` is the number of
-    independent distributions of this kind the instance represents.
-
-    Args:
-      name: name to give to the op
-
-    Returns:
-      `Tensor` `batch_shape`
-    """
-    return array_ops.shape(self._mean)
-
-  def get_batch_shape(self):
-    """`TensorShape` available at graph construction time.
-
-    Same meaning as `batch_shape`. May be only partially defined.
-
-    Returns:
-      batch shape
-    """
-    return self._get_batch_shape
-
-  def event_shape(self, name="event_shape"):
-    """Shape of a sample from a single distribution as a 1-D int32 `Tensor`.
-
-    Args:
-      name: name to give to the op
-
-    Returns:
-      `Tensor` `event_shape`
-    """
-    with ops.name_scope(self.name):
-      with ops.op_scope([], name):
-        return constant_op.constant([], name=name, dtype=dtypes.int32)
-
-  def get_event_shape(self):
-    """`TensorShape` available at graph construction time.
-
-    Same meaning as `event_shape`. May be only partially defined.
-
-    Returns:
-      event shape
-    """
-    return self._get_event_shape
+              n, message="n has non-integer components."),
+      ] if validate_args else []):
+        self._n = array_ops.identity(n, name="n")
+        self._logits, self._p = distribution_util.get_logits_and_prob(
+            name=name, logits=logits, p=p, validate_args=validate_args)
+    super(Binomial, self).__init__(
+        dtype=self._p.dtype,
+        is_continuous=False,
+        is_reparameterized=False,
+        validate_args=validate_args,
+        allow_nan_stats=allow_nan_stats,
+        parameters=parameters,
+        graph_parents=[self._n, self._p, self._logits],
+        name=ns)
 
   @property
   def n(self):
@@ -223,7 +168,7 @@ class Binomial(distribution.Distribution):
 
   @property
   def logits(self):
-    """Log-odds."""
+    """Log-odds of success."""
     return self._logits
 
   @property
@@ -231,103 +176,53 @@ class Binomial(distribution.Distribution):
     """Probability of success."""
     return self._p
 
-  def mean(self, name="mean"):
-    """Mean of the distribution."""
-    with ops.name_scope(self.name):
-      return array_ops.identity(self._mean, name=name)
+  def _batch_shape(self):
+    return array_ops.shape(self._n + self._p)
 
-  def variance(self, name="variance"):
-    """Variance of the distribution."""
-    with ops.name_scope(self.name):
-      with ops.op_scope([self._n, self._p], name):
-        return self._n * self._p * (1 - self._p)
+  def _get_batch_shape(self):
+    return common_shapes.broadcast_shape(self.n.get_shape(),
+                                         self.p.get_shape())
 
-  def std(self, name="std"):
-    """Standard deviation of the distribution."""
-    with ops.name_scope(self.name):
-      with ops.op_scope([self._n, self._p], name):
-        return math_ops.sqrt(self.variance())
+  def _event_shape(self):
+    return constant_op.constant([], dtype=dtypes.int32)
 
-  def mode(self, name="mode"):
-    """Mode of the distribution.
+  def _get_event_shape(self):
+    return tensor_shape.scalar()
 
-    Note that when `(n + 1) * p` is an integer, there are actually two modes.
-    Namely, `(n + 1) * p` and `(n + 1) * p - 1` are both modes. Here we return
-    only the larger of the two modes.
+  @distribution_util.AppendDocstring(_binomial_prob_note)
+  def _log_prob(self, counts):
+    counts = self._check_counts(counts)
+    prob_prob = (counts * math_ops.log(self.p) +
+                 (self.n - counts) * math_ops.log(1. - self.p))
+    combinations = (math_ops.lgamma(self.n + 1) -
+                    math_ops.lgamma(counts + 1) -
+                    math_ops.lgamma(self.n - counts + 1))
+    log_prob = prob_prob + combinations
+    return log_prob
 
-    Args:
-      name: The name for this op.
+  @distribution_util.AppendDocstring(_binomial_prob_note)
+  def _prob(self, counts):
+    return math_ops.exp(self._log_prob(counts))
 
-    Returns:
-      The mode of the Binomial distribution.
-    """
-    with ops.name_scope(self.name):
-      with ops.op_scope([self._n, self._p], name):
-        return math_ops.floor((self._n + 1) * self._p)
+  def _mean(self):
+    return self._n * self._p
 
-  def log_prob(self, counts, name="log_prob"):
-    """`Log(P[counts])`, computed for every batch member.
+  def _variance(self):
+    return self._n * self._p * (1 - self._p)
 
-    For each batch member of counts `k`, `P[counts]` is the probability that
-    after sampling `n` draws from this Binomial distribution, the number of
-    successes is `k`.  Note that different sequences of draws can result in the
-    same counts, thus the probability includes a combinatorial coefficient.
+  def _std(self):
+    return math_ops.sqrt(self._variance())
 
-    Args:
-      counts:  Non-negative tensor with dtype `dtype` and whose shape can be
-        broadcast with `self.p` and `self.n`. `counts` is only legal if it is
-        less than or equal to `n` and its components are equal to integer
-        values.
-      name:  Name to give this Op, defaults to "log_prob".
+  @distribution_util.AppendDocstring(
+      """Note that when `(n + 1) * p` is an integer, there are actually two
+      modes.  Namely, `(n + 1) * p` and `(n + 1) * p - 1` are both modes. Here
+      we return only the larger of the two modes.""")
+  def _mode(self):
+    return math_ops.floor((self._n + 1) * self._p)
 
-    Returns:
-      Log probabilities for each record, shape `[N1,...,Nm]`.
-    """
-    n = self._n
-    p = self._p
-    with ops.name_scope(self.name):
-      with ops.op_scope([self._n, self._p, counts], name):
-        counts = self._check_counts(counts)
-
-        prob_prob = counts * math_ops.log(p) + (
-            n - counts) * math_ops.log(1 - p)
-
-        combinations = math_ops.lgamma(n + 1) - math_ops.lgamma(
-            counts + 1) - math_ops.lgamma(n - counts + 1)
-        log_prob = prob_prob + combinations
-        return log_prob
-
-  def prob(self, counts, name="prob"):
-    """`P[counts]`, computed for every batch member.
-
-
-    For each batch member of counts `k`, `P[counts]` is the probability that
-    after sampling `n` draws from this Binomial distribution, the number of
-    successes is `k`.  Note that different sequences of draws can result in the
-    same counts, thus the probability includes a combinatorial coefficient.
-
-    Args:
-      counts:  Non-negative tensor with dtype `dtype` and whose shape can be
-        broadcast with `self.p` and `self.n`. `counts` is only legal if it is
-        less than or equal to `n` and its components are equal to integer
-        values.
-      name:  Name to give this Op, defaults to "prob".
-
-    Returns:
-      Probabilities for each record, shape `[N1,...,Nm]`.
-    """
-    return super(Binomial, self).prob(counts, name=name)
-
-  @property
-  def is_continuous(self):
-    return False
-
-  @property
-  def is_reparameterized(self):
-    return False
-
+  @distribution_util.AppendDocstring(
+      """Check counts for proper shape, values, then return tensor version.""")
   def _check_counts(self, counts):
-    """Check counts for proper shape, values, then return tensor version."""
     counts = ops.convert_to_tensor(counts, name="counts_before_deps")
     if not self.validate_args:
       return counts

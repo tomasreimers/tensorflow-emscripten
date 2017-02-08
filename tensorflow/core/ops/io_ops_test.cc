@@ -17,6 +17,7 @@ limitations under the License.
 #include "tensorflow/core/framework/node_def_builder.h"
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/shape_inference_testutil.h"
+#include "tensorflow/core/lib/core/status_test_util.h"
 #include "tensorflow/core/platform/test.h"
 
 namespace tensorflow {
@@ -24,12 +25,12 @@ namespace tensorflow {
 TEST(IoOpsTest, Save_ShapeFn) {
   ShapeInferenceTestOp op("Save");
 
-  TF_CHECK_OK(NodeDefBuilder("test", op.name)
-                  .Input({"a", 0, DT_STRING})
-                  .Input({"b", 0, DT_STRING})
-                  .Input({{"c", 0, DT_FLOAT}, {"d", 0, DT_INT64}})
-                  .Attr("T", {DT_FLOAT, DT_INT64})
-                  .Finalize(&op.node_def));
+  TF_ASSERT_OK(NodeDefBuilder("test", op.name)
+                   .Input({"a", 0, DT_STRING})
+                   .Input({"b", 0, DT_STRING})
+                   .Input({{"c", 0, DT_FLOAT}, {"d", 0, DT_INT64}})
+                   .Attr("T", {DT_FLOAT, DT_INT64})
+                   .Finalize(&op.node_def));
   INFER_OK(op, "?;?;?;?", "");
   INFER_OK(op, "[];[2];?;?", "");
 
@@ -44,13 +45,13 @@ TEST(IoOpsTest, Save_ShapeFn) {
 TEST(IoOpsTest, SaveSlices_ShapeFn) {
   ShapeInferenceTestOp op("SaveSlices");
 
-  TF_CHECK_OK(NodeDefBuilder("test", op.name)
-                  .Input({"a", 0, DT_STRING})
-                  .Input({"b", 0, DT_STRING})
-                  .Input({"c", 0, DT_STRING})
-                  .Input({{"d", 0, DT_FLOAT}, {"e", 0, DT_INT64}})
-                  .Attr("T", {DT_FLOAT, DT_INT64})
-                  .Finalize(&op.node_def));
+  TF_ASSERT_OK(NodeDefBuilder("test", op.name)
+                   .Input({"a", 0, DT_STRING})
+                   .Input({"b", 0, DT_STRING})
+                   .Input({"c", 0, DT_STRING})
+                   .Input({{"d", 0, DT_FLOAT}, {"e", 0, DT_INT64}})
+                   .Attr("T", {DT_FLOAT, DT_INT64})
+                   .Finalize(&op.node_def));
   INFER_OK(op, "?;?;?;?;?", "");
   INFER_OK(op, "[];[2];[2];?;?", "");
   INFER_OK(op, "[];[2];[2];[100,200,300];[4,5]", "");
@@ -115,9 +116,7 @@ TEST(IoOpsTest, ShardedFilespec_ShapeFn) {
 }
 
 TEST(IoOpsTest, SingleScalarInputAndOutput_ShapeFns) {
-  for (const char* op_name :
-       {"ReaderNumRecordsProduced", "ReaderNumWorkUnitsCompleted",
-        "ReaderSerializeState", "ReadFile"}) {
+  for (const char* op_name : {"ReadFile"}) {
     ShapeInferenceTestOp op(op_name);
 
     INFER_OK(op, "?", "[]");
@@ -126,46 +125,59 @@ TEST(IoOpsTest, SingleScalarInputAndOutput_ShapeFns) {
   }
 }
 
+TEST(IoOpsTest, TwoElementVectorInputsAndScalarOutput_ShapeFns) {
+  for (const char* op_name :
+       {"ReaderNumRecordsProduced", "ReaderNumWorkUnitsCompleted",
+        "ReaderSerializeState"}) {
+    ShapeInferenceTestOp op(op_name);
+
+    INFER_OK(op, "?", "[]");
+    INFER_OK(op, "[2]", "[]");
+    INFER_ERROR("Shape must be rank 1 but is rank 0", op, "[]");
+    INFER_ERROR("Dimension must be 2 but is 3", op, "[3]");
+  }
+}
+
 TEST(IoOpsTest, ReaderRead_ShapeFn) {
   ShapeInferenceTestOp op("ReaderRead");
 
   INFER_OK(op, "?;?", "[];[]");
-  INFER_OK(op, "[];[]", "[];[]");
+  INFER_OK(op, "[2];[?]", "[];[]");
 
-  // Both inputs must be scalars.
-  INFER_ERROR("Shape must be rank 0 but is rank 1", op, "[?];[]");
-  INFER_ERROR("Shape must be rank 0 but is rank 1", op, "[];[?]");
+  // Both inputs must be vectors of length 2.
+  INFER_ERROR("Shape must be rank 1 but is rank 2", op, "[?,?];[2]");
+  INFER_ERROR("Shape must be rank 1 but is rank 0", op, "[2];[]");
 }
 
 TEST(IoOpsTest, ReaderReadUpTo_ShapeFn) {
   ShapeInferenceTestOp op("ReaderReadUpTo");
 
-  INFER_OK(op, "?;?;?", "[?];[?]");
-  INFER_OK(op, "[];[];[]", "[?];[?]");
+  INFER_OK(op, "[2];[2];[]", "[?];[?]");
 
-  // All three inputs must be scalars.
-  INFER_ERROR("Shape must be rank 0 but is rank 1", op, "[?];[];[]");
-  INFER_ERROR("Shape must be rank 0 but is rank 1", op, "[];[?];[]");
-  INFER_ERROR("Shape must be rank 0 but is rank 1", op, "[];[];[?]");
+  // Third input must be scalar, first two must be vectors of 2
+  INFER_ERROR("Shape must be rank 1 but is rank 0", op, "[];[2];[]");
+  INFER_ERROR("Shape must be rank 1 but is rank 0", op, "[2];[];[]");
+  INFER_ERROR("Shape must be rank 0 but is rank 1", op, "[2];[2];[?]");
 }
 
 TEST(IoOpsTest, ReaderReset_ShapeFn) {
   ShapeInferenceTestOp op("ReaderReset");
 
+  INFER_OK(op, "[2]", "");
+  INFER_OK(op, "[?]", "");
   INFER_OK(op, "?", "");
-  INFER_OK(op, "[]", "");
-  INFER_ERROR("Shape must be rank 0 but is rank 1", op, "[?]");
+  INFER_ERROR("Shape must be rank 1 but is rank 0", op, "[]");
 }
 
 TEST(IoOpsTest, ReaderRestoreState_ShapeFn) {
   ShapeInferenceTestOp op("ReaderRestoreState");
 
   INFER_OK(op, "?;?", "");
-  INFER_OK(op, "[];[]", "");
+  INFER_OK(op, "[2];[]", "");
 
-  // Both inputs must be scalars.
-  INFER_ERROR("Shape must be rank 0 but is rank 1", op, "[?];[]");
-  INFER_ERROR("Shape must be rank 0 but is rank 1", op, "[];[?]");
+  // First input must be a vector and the second a scalar
+  INFER_ERROR("Shape must be rank 1 but is rank 0", op, "[];[]");
+  INFER_ERROR("Shape must be rank 0 but is rank 1", op, "[?];[?]");
 }
 
 TEST(IoOpsTest, MatchingFiles_ShapeFn) {

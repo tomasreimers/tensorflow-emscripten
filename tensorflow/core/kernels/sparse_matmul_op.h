@@ -19,6 +19,10 @@ limitations under the License.
 #include "third_party/eigen3/Eigen/Core"
 #include "tensorflow/core/platform/types.h"
 
+#if defined(PLATFORM_WINDOWS)
+#include "tensorflow/core/platform/windows/intrinsics_port.h"
+#endif
+
 namespace Eigen {
 namespace internal {
 
@@ -41,7 +45,8 @@ EIGEN_DEVICE_FUNC inline Packet pexpand_bf16_u(const Packet& from) {
 }
 
 // Specialization non-scalar version on non-sse.
-#ifndef EIGEN_VECTORIZE_SSE2
+#if defined(EIGEN_VECTORIZE_ALTIVEC) || defined(EIGEN_VECTORIZE_VSX) || \
+    defined(EIGEN_VECTORIZE_NEON)
 template <typename Packet>
 EIGEN_DEVICE_FUNC inline Packet4f pexpand_bf16_l(const Packet4f& from) {
   float r[4];
@@ -111,8 +116,9 @@ EIGEN_DEVICE_FUNC inline Packet pload2bf16(
   return Packet();
 }
 
-// Specialization for pload4bf16 and pload2bf16 for non-sse. 
-#ifndef EIGEN_VECTORIZE_SSE2
+// Specialization for pload4bf16 and pload2bf16 for non-sse.
+#if defined(EIGEN_VECTORIZE_ALTIVEC) || defined(EIGEN_VECTORIZE_VSX) || \
+    defined(EIGEN_VECTORIZE_NEON)
 template <>
 EIGEN_STRONG_INLINE Packet4f pload4bf16<Packet4f>(const float* from) {
   tensorflow::uint32 p[4];

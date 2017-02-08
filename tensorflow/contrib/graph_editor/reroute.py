@@ -22,13 +22,30 @@ from tensorflow.contrib.graph_editor import subgraph
 from tensorflow.contrib.graph_editor import util
 from tensorflow.python.framework import ops as tf_ops
 
+__all__ = [
+    "swap_ts",
+    "reroute_a2b_ts",
+    "reroute_b2a_ts",
+    "swap_inputs",
+    "reroute_a2b_inputs",
+    "reroute_b2a_inputs",
+    "swap_outputs",
+    "reroute_a2b_outputs",
+    "reroute_b2a_outputs",
+    "swap",
+    "reroute_a2b",
+    "reroute_b2a",
+    "remove_control_inputs",
+    "add_control_inputs",
+]
+
 
 def _check_ts_compatibility(ts0, ts1):
   """Make sure the shape and dtype of the two tensor's lists are compatible.
 
   Args:
-    ts0: an object convertible to a list of tf.Tensor.
-    ts1: an object convertible to a list of tf.Tensor.
+    ts0: an object convertible to a list of `tf.Tensor`.
+    ts1: an object convertible to a list of `tf.Tensor`.
   Raises:
     ValueError: if any pair of tensors (same index in ts0 and ts1) have
       a dtype or a shape which is not compatible.
@@ -69,8 +86,7 @@ class _RerouteMode(object):
     Args:
       mode: an integer representing one of the modes.
     Returns:
-      True if a is rerouted to b (mode is swap or a2b).
-      True if b is rerouted to a (mode is swap or b2a).
+      A tuple `(a2b, b2a)` boolean indicating what rerouting needs doing.
     Raises:
       ValueError: if mode is outside the enum range.
     """
@@ -87,7 +103,8 @@ class _RerouteMode(object):
 def _reroute_t(t0, t1, consumers1, can_modify=None, cannot_modify=None):
   """Reroute the end of the tensors (t0,t1).
 
-  Warning: this function is directly manipulating the internals of the tf.Graph.
+  Warning: this function is directly manipulating the internals of the
+  `tf.Graph`.
 
   Args:
     t0: a tf.Tensor.
@@ -146,8 +163,8 @@ def _reroute_ts(ts0, ts1, mode, can_modify=None, cannot_modify=None):
   Warning: this function is directly manipulating the internals of the tf.Graph.
 
   Args:
-    ts0: an object convertible to a list of tf.Tensor.
-    ts1: an object convertible to a list of tf.Tensor.
+    ts0: an object convertible to a list of `tf.Tensor`.
+    ts1: an object convertible to a list of `tf.Tensor`.
     mode: what to do with those tensors: "a->b" or "b<->a" for swaping and
       "a->b" or "b->a" for one direction re-routing.
     can_modify: iterable of operations which can be modified. Any operation
@@ -158,9 +175,9 @@ def _reroute_ts(ts0, ts1, mode, can_modify=None, cannot_modify=None):
   Returns:
     The number of individual modifications made by the function.
   Raises:
-    TypeError: if ts0 or ts1 cannot be converted to a list of tf.Tensor.
-    TypeError: if can_modify or cannot_modify is not None and cannot be
-      converted to a list of tf.Operation.
+    TypeError: if `ts0` or `ts1` cannot be converted to a list of `tf.Tensor`.
+    TypeError: if `can_modify` or `cannot_modify` is not `None` and cannot be
+      converted to a list of `tf.Operation`.
   """
   a2b, b2a = _RerouteMode.check(mode)
   ts0 = util.make_list_of_t(ts0)
@@ -171,17 +188,22 @@ def _reroute_ts(ts0, ts1, mode, can_modify=None, cannot_modify=None):
   if can_modify is not None:
     can_modify = frozenset(util.make_list_of_op(can_modify))
   nb_update_inputs = 0
+  precomputed_consumers = []
+  # precompute consumers to avoid issue with repeated tensors:
   for t0, t1 in zip(ts0, ts1):
-    if t0 is t1:
-      continue  # Silently ignore identical tensors.
     consumers0 = set(t0.consumers())
     consumers1 = set(t1.consumers())
+    precomputed_consumers.append((consumers0, consumers1))
+  for t0, t1, consumers in zip(ts0, ts1, precomputed_consumers):
+    if t0 is t1:
+      continue  # Silently ignore identical tensors.
+    consumers0, consumers1 = consumers
     if a2b:
-      nb_update_inputs += _reroute_t(t0, t1, consumers1,
-                                     can_modify, cannot_modify)
+      nb_update_inputs += _reroute_t(t0, t1, consumers1, can_modify,
+                                     cannot_modify)
     if b2a:
-      nb_update_inputs += _reroute_t(t1, t0, consumers0,
-                                     can_modify, cannot_modify)
+      nb_update_inputs += _reroute_t(t1, t0, consumers0, can_modify,
+                                     cannot_modify)
   return nb_update_inputs
 
 
@@ -193,15 +215,15 @@ def swap_ts(ts0, ts1, can_modify=None, cannot_modify=None):
   A0 A1     A0 A1
 
   Args:
-    ts0: an object convertible to a list of tf.Tensor.
-    ts1: an object convertible to a list of tf.Tensor.
+    ts0: an object convertible to a list of `tf.Tensor`.
+    ts1: an object convertible to a list of `tf.Tensor`.
     can_modify: iterable of operations which can be modified. Any operation
       outside within_ops will be left untouched by this function.
     cannot_modify: iterable of operations which cannot be modified.
       Any operation within cannot_modify will be left untouched by this
       function.
   Returns:
-    the number of individual modifications made by the function.
+    The number of individual modifications made by the function.
   Raises:
     TypeError: if ts0 or ts1 cannot be converted to a list of tf.Tensor.
     TypeError: if can_modify or cannot_modify is not None and cannot be
@@ -220,14 +242,14 @@ def reroute_a2b_ts(ts0, ts1, can_modify=None, cannot_modify=None):
   The end of the tensors in ts1 are left dangling.
 
   Args:
-    ts0: an object convertible to a list of tf.Tensor.
-    ts1: an object convertible to a list of tf.Tensor.
+    ts0: an object convertible to a list of `tf.Tensor`.
+    ts1: an object convertible to a list of `tf.Tensor`.
     can_modify: iterable of operations which can be modified. Any operation
       outside within_ops will be left untouched by this function.
     cannot_modify: iterable of operations which cannot be modified. Any
       operation within cannot_modify will be left untouched by this function.
   Returns:
-    the number of individual modifications made by the function.
+    The number of individual modifications made by the function.
   Raises:
     TypeError: if ts0 or ts1 cannot be converted to a list of tf.Tensor.
     TypeError: if can_modify or cannot_modify is not None and cannot be
@@ -246,15 +268,15 @@ def reroute_b2a_ts(ts0, ts1, can_modify=None, cannot_modify=None):
   The end of the tensors in ts0 are left dangling.
 
   Args:
-    ts0: an object convertible to a list of tf.Tensor.
-    ts1: an object convertible to a list of tf.Tensor.
+    ts0: an object convertible to a list of `tf.Tensor`.
+    ts1: an object convertible to a list of `tf.Tensor`.
     can_modify: iterable of operations which can be modified. Any operation
       outside within_ops will be left untouched by this function.
     cannot_modify: iterable of operations which cannot be modified.
       Any operation within cannot_modify will be left untouched by this
       function.
   Returns:
-    the number of individual modifications made by the function.
+    The number of individual modifications made by the function.
   Raises:
     TypeError: if ts0 or ts1 cannot be converted to a list of tf.Tensor.
     TypeError: if can_modify or cannot_modify is not None and cannot be
@@ -286,10 +308,9 @@ def _reroute_sgv_remap(sgv0, sgv1, mode):
   sgv1_ = sgv1.copy()
   # pylint: disable=protected-access
   if a2b and b2a:
-    (sgv0_._input_ts, sgv1_._input_ts) = (
-        sgv1_._input_ts, sgv0_._input_ts)
-    (sgv0_._passthrough_ts, sgv1_._passthrough_ts) = (
-        sgv1_._passthrough_ts, sgv0_._passthrough_ts)
+    (sgv0_._input_ts, sgv1_._input_ts) = (sgv1_._input_ts, sgv0_._input_ts)
+    (sgv0_._passthrough_ts, sgv1_._passthrough_ts) = (sgv1_._passthrough_ts,
+                                                      sgv0_._passthrough_ts)
   elif a2b:
     sgv1_._input_ts = sgv0_._input_ts[:]
     sgv1_._passthrough_ts = sgv0_._passthrough_ts[:]
@@ -306,8 +327,11 @@ def _reroute_sgv_remap(sgv0, sgv1, mode):
         ii = a._input_ts.index(t)
         b._output_ts[i] = b._input_ts[ii]
     # pylint: enable=protected-access
-  if a2b: update_passthrough_outputs(sgv0_, sgv1_)
-  if b2a: update_passthrough_outputs(sgv1_, sgv0_)
+
+  if a2b:
+    update_passthrough_outputs(sgv0_, sgv1_)
+  if b2a:
+    update_passthrough_outputs(sgv1_, sgv0_)
 
   # in-place
   # pylint: disable=protected-access
@@ -328,8 +352,8 @@ def _reroute_sgv_inputs(sgv0, sgv1, mode):
       subgraph.make_view.
     mode: reroute mode, see _reroute_ts(...).
   Returns:
-    Two new subgraph views with their inputs swapped.
-      Note that sgv0 and sgv1 are also modified in place.
+    A tuple `(sgv0, sgv1)` of subgraph views with their inputs swapped.
+      Note that the function argument sgv0 and sgv1 are also modified in place.
   Raises:
     StandardError: if sgv0 or sgv1 cannot be converted to a SubGraphView using
       the same rules than the function subgraph.make_view.
@@ -358,8 +382,8 @@ def _reroute_sgv_outputs(sgv0, sgv1, mode):
       subgraph.make_view.
     mode: reroute mode, see _reroute_ts(...).
   Returns:
-    Two new subgraph views with their outputs swapped.
-      Note that sgv0 and sgv1 are also modified in place.
+    A tuple `(sgv0, sgv1)` of subgraph views with their outputs swapped.
+      Note that the function argument sgv0 and sgv1 are also modified in place.
   Raises:
     StandardError: if sgv0 or sgv1 cannot be converted to a SubGraphView using
       the same rules than the function subgraph.make_view.
@@ -384,8 +408,9 @@ def _reroute_sgv(sgv0, sgv1, mode):
       subgraph using the same rules than the function subgraph.make_view.
     mode: reroute mode, see _reroute_ts(...).
   Returns:
-    Two new subgraph views with their outputs and inputs swapped.
-      Note that sgv0 and sgv1 are also modified in place.
+    A tuple `(sgv0, sgv1)` of subgraph views with their outputs and inputs
+      swapped.
+      Note that the function argument sgv0 and sgv1 are also modified in place.
   Raises:
     StandardError: if sgv0 or sgv1 cannot be converted to a SubGraphView using
       the same rules than the function subgraph.make_view.
@@ -443,13 +468,14 @@ def reroute_b2a(sgv0, sgv1):
 def remove_control_inputs(op, cops):
   """Remove the control inputs cops from co.
 
-  Warning: this function is directly manipulating the internals of the tf.Graph.
+  Warning: this function is directly manipulating the internals of the
+  `tf.Graph`.
 
   Args:
-    op: a tf.Operation from which to remove the control inputs.
-    cops: an object convertible to a list of tf.Operation.
+    op: a `tf.Operation` from which to remove the control inputs.
+    cops: an object convertible to a list of `tf.Operation`.
   Raises:
-    TypeError: if op is not a tf.Operation
+    TypeError: if op is not a `tf.Operation`.
     ValueError: if any cop in cops is not a control input of op.
   """
   if not isinstance(op, tf_ops.Operation):
@@ -472,7 +498,7 @@ def add_control_inputs(op, cops):
 
   Args:
     op: a tf.Operation to which the control inputs are added.
-    cops: an object convertible to a list of tf.Operation.
+    cops: an object convertible to a list of `tf.Operation`.
   Raises:
     TypeError: if op is not a tf.Operation
     ValueError: if any cop in cops is already a control input of op.

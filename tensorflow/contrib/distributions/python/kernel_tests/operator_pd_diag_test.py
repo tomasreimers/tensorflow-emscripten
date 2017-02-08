@@ -59,15 +59,15 @@ class OperatorPDDiagBaseTest(object):
 
     return operator, mat
 
-  def test_non_positive_definite_matrix_raises(self):
+  def testNonPositiveDefiniteMatrixRaises(self):
     # Singlular matrix with one positive eigenvalue and one zero eigenvalue.
     with self.test_session():
       diag = [1.0, 0.0]
       operator = operator_pd_diag.OperatorPDSqrtDiag(diag)
-      with self.assertRaisesOpError('assert_positive'):
+      with self.assertRaisesOpError("assert_positive"):
         operator.to_dense().eval()
 
-  def test_non_positive_definite_matrix_does_not_raise_if_not_verify_pd(self):
+  def testNonPositiveDefiniteMatrixDoesNotRaiseIfNotVerifyPd(self):
     # Singlular matrix with one positive eigenvalue and one zero eigenvalue.
     with self.test_session():
       diag = [1.0, 0.0]
@@ -80,7 +80,7 @@ class OperatorPDDiagTest(
   """Most tests done in the base classes."""
 
   def _diag_to_matrix(self, diag):
-    return tf.batch_matrix_diag(diag).eval()
+    return tf.matrix_diag(diag).eval()
 
   @property
   def operator_class(self):
@@ -92,12 +92,12 @@ class OperatorPDSqrtDiagTest(
   """Most tests done in the base classes."""
 
   def _diag_to_matrix(self, diag):
-    return tf.batch_matrix_diag(diag**2).eval()
+    return tf.matrix_diag(diag**2).eval()
 
   @property
   def operator_class(self):
     return operator_pd_diag.OperatorPDSqrtDiag
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   tf.test.main()

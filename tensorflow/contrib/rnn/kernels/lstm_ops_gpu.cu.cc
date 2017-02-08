@@ -26,11 +26,14 @@ typedef Eigen::GpuDevice GPUDevice;
 
 #define DEFINE_GPU_SPECS(T)                               \
   template struct TensorZero<GPUDevice, T>;               \
+  template struct TensorUnalignedZero<GPUDevice, T>;      \
   template struct TensorCopy<GPUDevice, T>;               \
+  template struct TensorCopyUnaligned<GPUDevice, T>;      \
+  template struct TensorCopyToUnaligned<GPUDevice, T>;    \
   template struct TensorAdd<GPUDevice, T>;                \
-  template struct LSTMFusedCellFprop<GPUDevice, T, true>; \
-  template struct LSTMFusedCellBprop<GPUDevice, T, true>; \
-  template struct FusedLSTMBprop<GPUDevice, T, true>;
+  template struct LSTMBlockCellFprop<GPUDevice, T, true>; \
+  template struct LSTMBlockCellBprop<GPUDevice, T, true>; \
+  template struct BlockLSTMBprop<GPUDevice, T, true>;
 
 DEFINE_GPU_SPECS(float);
 // DEFINE_GPU_SPECS(double);

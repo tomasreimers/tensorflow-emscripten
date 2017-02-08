@@ -78,6 +78,12 @@ void SendOp::Compute(OpKernelContext* ctx) {
 REGISTER_KERNEL_BUILDER(Name("_Send").Device(DEVICE_CPU), SendOp);
 REGISTER_KERNEL_BUILDER(Name("_Send").Device(DEVICE_GPU), SendOp);
 
+#if TENSORFLOW_USE_SYCL
+REGISTER_KERNEL_BUILDER(Name("_Send").Device(DEVICE_SYCL), SendOp);
+REGISTER_KERNEL_BUILDER(
+    Name("_HostSend").Device(DEVICE_SYCL).HostMemory("tensor"), SendOp);
+#endif
+
 REGISTER_KERNEL_BUILDER(Name("_HostSend").Device(DEVICE_CPU), SendOp);
 REGISTER_KERNEL_BUILDER(
     Name("_HostSend").Device(DEVICE_GPU).HostMemory("tensor"), SendOp);
@@ -110,30 +116,43 @@ void RecvOp::ComputeAsync(OpKernelContext* ctx, DoneCallback done) {
   Rendezvous::Args args;
   args.device_context = ctx->op_device_context();
   args.alloc_attrs = ctx->output_alloc_attr(0);
-  DoneCallback done_cb = std::move(done);
-  ctx->rendezvous()->RecvAsync(
-      parsed, args,
-      [ctx, done_cb](const Status& s, const Rendezvous::Args& send_args,
-                     const Rendezvous::Args& recv_args, const Tensor& val,
-                     bool is_dead) {
+  using namespace std::placeholders;
+  Rendezvous::DoneCallback done_cb = std::bind(
+      [ctx](DoneCallback done,
+            // Begin unbound arguments.
+            const Status& s, const Rendezvous::Args& send_args,
+            const Rendezvous::Args& recv_args, const Tensor& val,
+            bool is_dead) {
         ctx->SetStatus(s);
         if (s.ok()) {
-          // 'ctx' allocates the output tensor of the expected type.  The
-          // runtime checks whether the tensor received here is the same type.
+          // 'ctx' allocates the output tensor of the expected type.
+          // The runtime checks whether the tensor received here is
+          // the same type.
           if (!is_dead) {
             ctx->set_output(0, val);
           }
           *ctx->is_output_dead() = is_dead;
         }
-        done_cb();
-      });
+        done();
+      },
+      std::move(done), _1, _2, _3, _4, _5);
+  ctx->rendezvous()->RecvAsync(parsed, args, std::move(done_cb));
 }
 
 REGISTER_KERNEL_BUILDER(Name("_Recv").Device(DEVICE_CPU), RecvOp);
 REGISTER_KERNEL_BUILDER(Name("_Recv").Device(DEVICE_GPU), RecvOp);
 
+#if TENSORFLOW_USE_SYCL
+REGISTER_KERNEL_BUILDER(Name("_Recv").Device(DEVICE_SYCL), RecvOp);
+#endif
+
 REGISTER_KERNEL_BUILDER(Name("_HostRecv").Device(DEVICE_CPU), RecvOp);
 REGISTER_KERNEL_BUILDER(
     Name("_HostRecv").Device(DEVICE_GPU).HostMemory("tensor"), RecvOp);
+
+#if TENSORFLOW_USE_SYCL
+REGISTER_KERNEL_BUILDER(
+    Name("_HostRecv").Device(DEVICE_SYCL).HostMemory("tensor"), RecvOp);
+#endif
 
 }  // end namespace tensorflow

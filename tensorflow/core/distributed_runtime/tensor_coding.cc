@@ -14,14 +14,86 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/core/distributed_runtime/tensor_coding.h"
+#include "tensorflow/core/common_runtime/device.h"
 
 namespace tensorflow {
 
-TensorResponse::TensorResponse(Allocator* allocator) : allocator_(allocator) {}
+TensorResponse::Source::~Source() {}
+
+void TensorResponse::Clear() {
+  on_host_ = false;
+  device_ = nullptr;
+  alloc_attrs_ = AllocatorAttributes();
+  allocator_ = nullptr;
+  already_used_ = false;
+  ClearTensor();
+}
+
+void TensorResponse::ClearTensor() {
+  meta_.Clear();
+  tensor_ = Tensor();
+}
+
+void TensorResponse::InitAlloc(DeviceBase* d, const AllocatorAttributes& aa) {
+  Clear();
+  device_ = d;
+  alloc_attrs_ = aa;
+  const DeviceAttributes& da = d->attributes();
+  if (alloc_attrs_.on_host() || da.device_type() == "CPU") {
+    on_host_ = true;
+  }
+  allocator_ = device_->GetAllocator(alloc_attrs_);
+}
+
+Status TensorResponse::InitFrom(RecvTensorResponse* response) {
+  Status s;
+  meta_.Swap(response);
+  if (on_host_) {
+    if (!tensor_.FromProto(allocator_, meta_.tensor())) {
+      s = errors::InvalidArgument("Cannot parse tensor from response");
+    }
+  } else {
+    s = device_->MakeTensorFromProto(meta_.tensor(), alloc_attrs_, &tensor_);
+  }
+  {
+    TensorProto empty;
+    meta_.mutable_tensor()->Swap(&empty);
+  }
+  meta_.clear_tensor();
+  return s;
+}
+
+void TensorResponse::InitPartial(const RecvTensorResponse& response) {
+  // Everything except content is present in *response.  Content will
+  // arrive later; allocate a Tensor with appropriate storage for that
+  // content.
+  meta_ = response;
+  TensorShape shape(meta_.tensor().tensor_shape());
+  Tensor t(allocator_, meta_.tensor().dtype(), shape);
+  tensor_ = std::move(t);
+}
 
 Status TensorResponse::ParseFrom(Source* source) {
+  if (!on_host_) {
+    protobuf::io::CodedInputStream input(source->contents());
+    input.SetTotalBytesLimit(INT_MAX, INT_MAX);  // Unlimited
+
+    // Pre-parse into local storage, then delegate to device.
+    if (!meta_.ParseFromCodedStream(&input) || !input.ConsumedEntireMessage()) {
+      return errors::InvalidArgument("Cannot parse tensor from response");
+    }
+    Status s =
+        device_->MakeTensorFromProto(meta_.tensor(), alloc_attrs_, &tensor_);
+    // Reduce memory usage for big tensors.
+    {
+      TensorProto empty;
+      meta_.mutable_tensor()->Swap(&empty);
+    }
+    meta_.clear_tensor();
+    return s;
+  }
   if (already_used_) {
-    Clear();
+    ClearTensor();
   }
   already_used_ = true;
   if (ParseFast(source)) return Status::OK();
@@ -43,7 +115,7 @@ inline WireType GetTagWireType(uint32 tag) {
 }
 
 bool ReadVarintSizeAsInt(protobuf::io::CodedInputStream* input, int* result) {
-  uint64 v;
+  protobuf_uint64 v;
   if (input->ReadVarint64(&v) && v <= static_cast<uint64>(INT_MAX)) {
     *result = static_cast<int>(v);
     return true;
@@ -120,7 +192,7 @@ bool TensorResponse::ParseTensorSubmessage(
         TensorShape shape(tensor_meta->tensor_shape());
         Tensor t(allocator_, tensor_meta->dtype(), shape);
         StringPiece buf = t.tensor_data();
-        if (num_bytes != buf.size()) return false;
+        if (static_cast<size_t>(num_bytes) != buf.size()) return false;
         // TODO(jeff,sanjay): Figure out a way to avoid this copy if
         // the underlying ZeroCopyInputStream data is properly aligned
         // and compatible with what allocator_ wants.
@@ -140,6 +212,7 @@ bool TensorResponse::ParseTensorSubmessage(
 
 bool TensorResponse::ParseFast(Source* source) {
   protobuf::io::CodedInputStream input(source->contents());
+  input.SetTotalBytesLimit(INT_MAX, INT_MAX);  // Unlimited
   while (true) {
     auto p = input.ReadTagWithCutoff(127);
     int tag = GetTagFieldNumber(p.first);
@@ -171,7 +244,7 @@ bool TensorResponse::ParseFast(Source* source) {
         break;
       }
       case RecvTensorResponse::kSendStartMicrosFieldNumber: {
-        uint64 v;
+        protobuf_uint64 v;
         if ((wt != WIRETYPE_VARINT) || !input.ReadVarint64(&v)) return false;
         meta_.set_send_start_micros(static_cast<int64>(v));
         break;
@@ -211,11 +284,6 @@ bool TensorResponse::ParseSlow(Source* source) {
   meta_.clear_tensor();
 
   return true;
-}
-
-void TensorResponse::Clear() {
-  meta_.Clear();
-  tensor_ = Tensor();
 }
 
 }  // namespace tensorflow

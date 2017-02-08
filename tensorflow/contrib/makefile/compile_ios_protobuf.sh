@@ -45,9 +45,9 @@ IPHONEOS_SYSROOT=`xcrun --sdk iphoneos --show-sdk-path`
 IPHONESIMULATOR_PLATFORM=`xcrun --sdk iphonesimulator --show-sdk-platform-path`
 IPHONESIMULATOR_SYSROOT=`xcrun --sdk iphonesimulator --show-sdk-path`
 IOS_SDK_VERSION=`xcrun --sdk iphoneos --show-sdk-version`
-MIN_SDK_VERSION=9.2
+MIN_SDK_VERSION=8.2
 
-CFLAGS="-DNDEBUG -g -O0 -pipe -fPIC -fcxx-exceptions"
+CFLAGS="-DNDEBUG -Os -pipe -fPIC -fno-exceptions"
 CXXFLAGS="${CFLAGS} -std=c++11 -stdlib=libc++"
 LDFLAGS="-stdlib=libc++"
 LIBS="-lc++ -lc++abi"
@@ -71,7 +71,6 @@ fi
 
 make distclean
 ./configure \
---build=x86_64-apple-${OSX_VERSION} \
 --host=i386-apple-${OSX_VERSION} \
 --disable-shared \
 --enable-cross-compile \
@@ -99,7 +98,6 @@ make install
 
 make distclean
 ./configure \
---build=x86_64-apple-${OSX_VERSION} \
 --host=x86_64-apple-${OSX_VERSION} \
 --disable-shared \
 --enable-cross-compile \
@@ -127,7 +125,6 @@ make install
 
 make distclean
 ./configure \
---build=x86_64-apple-${OSX_VERSION} \
 --host=armv7-apple-${OSX_VERSION} \
 --with-protoc="${PROTOC_PATH}" \
 --disable-shared \
@@ -151,7 +148,6 @@ make install
 
 make distclean
 ./configure \
---build=x86_64-apple-${OSX_VERSION} \
 --host=armv7s-apple-${OSX_VERSION} \
 --with-protoc="${PROTOC_PATH}" \
 --disable-shared \
@@ -175,7 +171,6 @@ make install
 
 make distclean
 ./configure \
---build=x86_64-apple-${OSX_VERSION} \
 --host=arm \
 --with-protoc="${PROTOC_PATH}" \
 --disable-shared \

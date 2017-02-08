@@ -21,6 +21,7 @@ from __future__ import print_function
 from six.moves import xrange  # pylint: disable=redefined-builtin
 
 from tensorflow.python.framework import ops
+from tensorflow.python.framework import sparse_tensor
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import math_ops
 # go/tf-wildcard-import
@@ -129,7 +130,7 @@ def _RefMergeGrad(op, grad, _):
 
 
 @ops.RegisterGradient("Exit")
-def _ExitGrad(_, grad):
+def _ExitGrad(op, grad):
   """Gradients for an exit op are calculated using an Enter op."""
   graph = ops.get_default_graph()
   # pylint: disable=protected-access
@@ -140,10 +141,16 @@ def _ExitGrad(_, grad):
     # computation for this loop. If the attribute `back_prop` is false,
     # no gradient computation.
     return None
+
+  # pylint: disable=protected-access
+  if op._get_control_flow_context().grad_state:
+    raise TypeError("Second-order gradient for while loops not supported.")
+  # pylint: enable=protected-access
+
   if isinstance(grad, ops.Tensor):
     grad_ctxt.AddName(grad.name)
   else:
-    if not isinstance(grad, (ops.IndexedSlices, ops.SparseTensor)):
+    if not isinstance(grad, (ops.IndexedSlices, sparse_tensor.SparseTensor)):
       raise TypeError("Type %s not supported" % type(grad))
     grad_ctxt.AddName(grad.values.name)
     grad_ctxt.AddName(grad.indices.name)

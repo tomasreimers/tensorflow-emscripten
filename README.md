@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # tensorflow-emscripten
 
 ## About
@@ -62,5 +63,4 @@ $ python run_trails.py {mnist,labeler} {browser,node,c}
 **(Which will benchmark mnist/labeler in the browser/node/c.)**
 
 ## Author
-
 Tomas Reimers, September-December 2016

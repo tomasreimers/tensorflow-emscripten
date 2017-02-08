@@ -24,12 +24,12 @@ import numpy as np
 from tensorflow.contrib.learn.python.learn.dataframe import transform
 
 from tensorflow.python.framework import dtypes
-from tensorflow.python.framework import ops
+from tensorflow.python.framework import sparse_tensor
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 
 
-class Sparsify(transform.Transform):
+class Sparsify(transform.TensorFlowTransform):
   """Transforms Dense to Sparse Tensor."""
 
   def __init__(self, strip_value):
@@ -82,4 +82,5 @@ class Sparsify(transform.Transform):
     shape = math_ops.cast(array_ops.shape(d), dtypes.int64)
 
     # pylint: disable=not-callable
-    return self.return_type(ops.SparseTensor(sparse_indices, values, shape))
+    return self.return_type(
+        sparse_tensor.SparseTensor(sparse_indices, values, shape))

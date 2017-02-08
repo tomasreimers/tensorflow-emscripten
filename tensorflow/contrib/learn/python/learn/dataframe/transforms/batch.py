@@ -1,4 +1,4 @@
-# Copyright 2015 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ from tensorflow.contrib.learn.python.learn.dataframe import transform
 from tensorflow.python.training import input as input_ops
 
 
-class AbstractBatchTransform(transform.Transform):
+class AbstractBatchTransform(transform.TensorFlowTransform):
   """Abstract parent class for batching Transforms."""
 
   def __init__(self,

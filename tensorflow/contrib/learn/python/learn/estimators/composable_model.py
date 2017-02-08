@@ -25,12 +25,13 @@ import re
 import six
 
 from tensorflow.contrib import layers
+from tensorflow.contrib.framework import list_variables
+from tensorflow.contrib.framework import load_variable
 from tensorflow.contrib.layers.python.layers import feature_column_ops
-from tensorflow.contrib.learn.python.learn.utils import checkpoints
+from tensorflow.python import summary
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import clip_ops
 from tensorflow.python.ops import gradients
-from tensorflow.python.ops import logging_ops
 from tensorflow.python.ops import nn
 from tensorflow.python.ops import partitioned_variables
 from tensorflow.python.ops import variable_scope
@@ -55,7 +56,7 @@ class _ComposableModel(object):
     """Common initialization for all _ComposableModel objects.
 
     Args:
-      num_label_columns: The number of label/target columns.
+      num_label_columns: The number of label columns.
       optimizer: An instance of `tf.Optimizer` used to apply gradients to
         the model. If `None`, will use a FTRL optimizer.
       gradient_clip_norm: A float > 0. If provided, gradients are clipped
@@ -143,15 +144,19 @@ class LinearComposableModel(_ComposableModel):
   def __init__(self,
                num_label_columns,
                optimizer=None,
+               _joint_weights=False,
                gradient_clip_norm=None,
                num_ps_replicas=0,
                scope=None):
     """Initializes LinearComposableModel objects.
 
     Args:
-      num_label_columns: The number of label/target columns.
+      num_label_columns: The number of label columns.
       optimizer: An instance of `tf.Optimizer` used to apply gradients to
         the model. If `None`, will use a FTRL optimizer.
+      _joint_weights: If True use a single (possibly partitioned) variable
+        to store all weights in this model. Faster, but requires that all
+        feature columns are sparse and have the 'sum' combiner.
       gradient_clip_norm: A float > 0. If provided, gradients are clipped
         to their global norm with this clipping ratio. See
         tf.clip_by_global_norm for more details.
@@ -166,6 +171,7 @@ class LinearComposableModel(_ComposableModel):
         gradient_clip_norm=gradient_clip_norm,
         num_ps_replicas=num_ps_replicas,
         scope=scope)
+    self._joint_weights = _joint_weights
 
   def get_weights(self, model_dir):
     """Returns weights per feature of the linear part.
@@ -176,14 +182,14 @@ class LinearComposableModel(_ComposableModel):
     Returns:
       The weights created by this model (without the optimizer weights).
     """
-    all_variables = [name for name, _ in checkpoints.list_variables(model_dir)]
+    all_variables = [name for name, _ in list_variables(model_dir)]
     values = {}
     optimizer_regex = r".*/" + self._get_optimizer().get_name() + r"(_\d)?$"
     for name in all_variables:
       if (name.startswith(self._scope + "/") and
           name != self._scope + "/bias_weight" and
           not re.match(optimizer_regex, name)):
-        values[name] = checkpoints.load_variable(model_dir, name)
+        values[name] = load_variable(model_dir, name)
     if len(values) == 1:
       return values[list(values.keys())[0]]
     return values
@@ -197,8 +203,7 @@ class LinearComposableModel(_ComposableModel):
     Returns:
       The bias weights created by this model.
     """
-    return checkpoints.load_variable(model_dir,
-                                     name=(self._scope+"/bias_weight"))
+    return load_variable(model_dir, name=(self._scope+"/bias_weight"))
 
   def build_model(self, features, feature_columns, is_training):
     """See base class."""
@@ -206,14 +211,24 @@ class LinearComposableModel(_ComposableModel):
     partitioner = partitioned_variables.min_max_variable_partitioner(
         max_partitions=self._num_ps_replicas,
         min_slice_size=64 << 20)
-    with variable_scope.variable_op_scope(
-        features.values(), self._scope, partitioner=partitioner) as scope:
-      logits, _, _ = layers.weighted_sum_from_feature_columns(
-          columns_to_tensors=features,
-          feature_columns=self._get_feature_columns(),
-          num_outputs=self._num_label_columns,
-          weight_collections=[self._scope],
-          scope=scope)
+    with variable_scope.variable_scope(
+        self._scope,
+        values=features.values(),
+        partitioner=partitioner) as scope:
+      if self._joint_weights:
+        logits, _, _ = layers.joint_weighted_sum_from_feature_columns(
+            columns_to_tensors=features,
+            feature_columns=self._get_feature_columns(),
+            num_outputs=self._num_label_columns,
+            weight_collections=[self._scope],
+            scope=scope)
+      else:
+        logits, _, _ = layers.weighted_sum_from_feature_columns(
+            columns_to_tensors=features,
+            feature_columns=self._get_feature_columns(),
+            num_outputs=self._num_label_columns,
+            weight_collections=[self._scope],
+            scope=scope)
     return logits
 
   def _get_default_optimizer(self, optimizer_name=None):
@@ -244,7 +259,7 @@ class DNNComposableModel(_ComposableModel):
     """Initializes DNNComposableModel objects.
 
     Args:
-      num_label_columns: The number of label/target columns.
+      num_label_columns: The number of label columns.
       hidden_units: List of hidden units per layer. All layers are fully
         connected.
       optimizer: An instance of `tf.Optimizer` used to apply gradients to
@@ -280,11 +295,11 @@ class DNNComposableModel(_ComposableModel):
     Returns:
       The weights created by this model.
     """
-    return [checkpoints.load_variable(
-        model_dir, name=(self._scope+"/hiddenlayer_%d/weights" % i))
-            for i, _ in enumerate(self._hidden_units)] + [
-                checkpoints.load_variable(
-                    model_dir, name=(self._scope+"/logits/weights"))]
+    return [
+        load_variable(
+            model_dir, name=(self._scope+"/hiddenlayer_%d/weights" % i))
+        for i, _ in enumerate(self._hidden_units)
+    ] + [load_variable(model_dir, name=(self._scope+"/logits/weights"))]
 
   def get_bias(self, model_dir):
     """Returns the bias of the model.
@@ -295,17 +310,16 @@ class DNNComposableModel(_ComposableModel):
     Returns:
       The bias weights created by this model.
     """
-    return [checkpoints.load_variable(
-        model_dir, name=(self._scope+"/hiddenlayer_%d/biases" % i))
-            for i, _ in enumerate(self._hidden_units)] + [
-                checkpoints.load_variable(
-                    model_dir, name=(self._scope+"/logits/biases"))]
+    return [
+        load_variable(
+            model_dir, name=(self._scope+"/hiddenlayer_%d/biases" % i))
+        for i, _ in enumerate(self._hidden_units)
+    ] + [load_variable(model_dir, name=(self._scope+"/logits/biases"))]
 
   def _add_hidden_layer_summary(self, value, tag):
     # TODO(zakaria): Move this code to tf.learn and add test.
-    logging_ops.scalar_summary("%s:fraction_of_zero_values" % tag,
-                               nn.zero_fraction(value))
-    logging_ops.histogram_summary("%s:activation" % tag, value)
+    summary.scalar("%s:fraction_of_zero_values" % tag, nn.zero_fraction(value))
+    summary.histogram("%s:activation" % tag, value)
 
   def build_model(self, features, feature_columns, is_training):
     """See base class."""
@@ -315,9 +329,9 @@ class DNNComposableModel(_ComposableModel):
         partitioned_variables.min_max_variable_partitioner(
             max_partitions=self._num_ps_replicas,
             min_slice_size=64 << 20))
-    with variable_scope.variable_op_scope(
-        features.values(),
+    with variable_scope.variable_scope(
         self._scope + "/input_from_feature_columns",
+        values=features.values(),
         partitioner=input_layer_partitioner) as scope:
       net = layers.input_from_feature_columns(
           features,
@@ -329,8 +343,9 @@ class DNNComposableModel(_ComposableModel):
         partitioned_variables.min_max_variable_partitioner(
             max_partitions=self._num_ps_replicas))
     for layer_id, num_hidden_units in enumerate(self._hidden_units):
-      with variable_scope.variable_op_scope(
-          [net], self._scope + "/hiddenlayer_%d" % layer_id,
+      with variable_scope.variable_scope(
+          self._scope + "/hiddenlayer_%d" % layer_id,
+          values=[net],
           partitioner=hidden_layer_partitioner) as scope:
         net = layers.fully_connected(
             net,
@@ -344,8 +359,9 @@ class DNNComposableModel(_ComposableModel):
               keep_prob=(1.0 - self._dropout))
       self._add_hidden_layer_summary(net, scope.name)
 
-    with variable_scope.variable_op_scope(
-        [net], self._scope + "/logits",
+    with variable_scope.variable_scope(
+        self._scope + "/logits",
+        values=[net],
         partitioner=hidden_layer_partitioner) as scope:
       logits = layers.fully_connected(
           net,

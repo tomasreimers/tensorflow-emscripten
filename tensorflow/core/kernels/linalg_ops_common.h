@@ -39,7 +39,7 @@ limitations under the License.
 namespace tensorflow {
 
 // Base class for linear algebra operators.
-template <typename Scalar, bool SupportsBatchOperationT>
+template <typename Scalar>
 class LinearAlgebraOp : public OpKernel {
  public:
   explicit LinearAlgebraOp(OpKernelConstruction* context) : OpKernel(context) {}
@@ -114,6 +114,7 @@ class LinearAlgebraOp : public OpKernel {
   using MatrixMap = Eigen::Map<Matrix>;
   using ConstMatrixMaps = gtl::InlinedVector<ConstMatrixMap, 4>;
   using MatrixMaps = gtl::InlinedVector<MatrixMap, 4>;
+  using RealScalar = typename Eigen::NumTraits<Scalar>::Real;
 
   // Performs a single matrix computation given input matrices, and
   // stores the result in outputs. For batch operations, this will be called
@@ -164,10 +165,10 @@ class LinearAlgebraOp : public OpKernel {
 
 // Declare that LinearAlgebraOp is explicitly instantiated in
 // linalg_ops_common.cc for float and double.
-extern template class LinearAlgebraOp<float, false>;
-extern template class LinearAlgebraOp<float, true>;
-extern template class LinearAlgebraOp<double, false>;
-extern template class LinearAlgebraOp<double, true>;
+extern template class LinearAlgebraOp<float>;
+extern template class LinearAlgebraOp<double>;
+extern template class LinearAlgebraOp<complex64>;
+extern template class LinearAlgebraOp<complex128>;
 
 }  // namespace tensorflow
 

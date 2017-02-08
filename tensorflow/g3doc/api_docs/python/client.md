@@ -52,8 +52,7 @@ with tf.Session() as sess:
   sess.run(...)
 ```
 
-The [`ConfigProto`]
-(https://www.tensorflow.org/code/tensorflow/core/protobuf/config.proto)
+The [`ConfigProto`](https://www.tensorflow.org/code/tensorflow/core/protobuf/config.proto)
 protocol buffer exposes various configuration options for a
 session. For example, to create a session that uses soft constraints
 for device placement, and log the resulting placement decisions,
@@ -84,8 +83,8 @@ the session constructor.
 
 
 *  <b>`target`</b>: (Optional.) The execution engine to connect to.
-    Defaults to using an in-process engine. See [Distributed Tensorflow]
-    (https://www.tensorflow.org/how_tos/distributed/index.html)
+    Defaults to using an in-process engine. See
+    [Distributed Tensorflow](https://www.tensorflow.org/how_tos/distributed/index.html)
     for more examples.
 *  <b>`graph`</b>: (Optional.) The `Graph` to be launched (described above).
 *  <b>`config`</b>: (Optional.) A [`ConfigProto`](https://www.tensorflow.org/code/tensorflow/core/protobuf/config.proto)
@@ -314,6 +313,22 @@ If no resource containers are provided, all containers are reset.
 
 
 
+#### Other Methods
+- - -
+
+#### `tf.Session.__enter__()` {#Session.__enter__}
+
+
+
+
+- - -
+
+#### `tf.Session.__exit__(exec_type, exec_value, exec_tb)` {#Session.__exit__}
+
+
+
+
+
 - - -
 
 ### `class tf.InteractiveSession` {#InteractiveSession}
@@ -407,7 +422,7 @@ thread's function.
 
 
 
-## Error classes
+## Error classes and convenience functions
 
 - - -
 
@@ -454,11 +469,18 @@ Creates a new `OpError` indicating that a particular op failed.
 ##### Args:
 
 
-*  <b>`node_def`</b>: The `graph_pb2.NodeDef` proto representing the op that failed,
-    if known; otherwise None.
+*  <b>`node_def`</b>: The `node_def_pb2.NodeDef` proto representing the op that
+    failed, if known; otherwise None.
 *  <b>`op`</b>: The `ops.Operation` that failed, if known; otherwise None.
 *  <b>`message`</b>: The message string describing the failure.
 *  <b>`error_code`</b>: The `error_codes_pb2.Code` describing the error.
+
+
+- - -
+
+#### `tf.OpError.__str__()` {#OpError.__str__}
+
+
 
 
 - - -
@@ -772,6 +794,28 @@ operation, if the file is truncated while it is being read.
 #### `tf.errors.DataLossError.__init__(node_def, op, message)` {#DataLossError.__init__}
 
 Creates a `DataLossError`.
+
+
+
+
+- - -
+
+### `tf.errors.exception_type_from_error_code(error_code)` {#exception_type_from_error_code}
+
+
+
+
+- - -
+
+### `tf.errors.error_code_from_exception_type(cls)` {#error_code_from_exception_type}
+
+
+
+
+- - -
+
+### `tf.errors.raise_exception_on_not_ok_status()` {#raise_exception_on_not_ok_status}
+
 
 
 

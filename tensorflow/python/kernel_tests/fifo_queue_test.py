@@ -32,7 +32,6 @@ class FIFOQueueTest(tf.test.TestCase):
     with tf.Graph().as_default():
       q = tf.FIFOQueue(10, tf.float32, name="Q")
     self.assertTrue(isinstance(q.queue_ref, tf.Tensor))
-    self.assertEquals(tf.string_ref, q.queue_ref.dtype)
     self.assertProtoEquals("""
       name:'Q' op:'FIFOQueue'
       attr { key: 'component_types' value { list { type: DT_FLOAT } } }
@@ -46,7 +45,6 @@ class FIFOQueueTest(tf.test.TestCase):
     with tf.Graph().as_default():
       q = tf.FIFOQueue(5, (tf.int32, tf.float32), shared_name="foo", name="Q")
     self.assertTrue(isinstance(q.queue_ref, tf.Tensor))
-    self.assertEquals(tf.string_ref, q.queue_ref.dtype)
     self.assertProtoEquals("""
       name:'Q' op:'FIFOQueue'
       attr { key: 'component_types' value { list {
@@ -64,7 +62,6 @@ class FIFOQueueTest(tf.test.TestCase):
                        shapes=(tf.TensorShape([1, 1, 2, 3]),
                                tf.TensorShape([5, 8])), name="Q")
     self.assertTrue(isinstance(q.queue_ref, tf.Tensor))
-    self.assertEquals(tf.string_ref, q.queue_ref.dtype)
     self.assertProtoEquals("""
       name:'Q' op:'FIFOQueue'
       attr { key: 'component_types' value { list {
@@ -970,7 +967,7 @@ class FIFOQueueTest(tf.test.TestCase):
       close_op.run()
 
       # Expect the operation to fail due to the queue being closed.
-      with self.assertRaisesRegexp(tf.errors.AbortedError, "is closed"):
+      with self.assertRaisesRegexp(tf.errors.CancelledError, "is closed"):
         enqueue_op.run()
 
   def testEnqueueManyToClosedQueue(self):
@@ -984,7 +981,7 @@ class FIFOQueueTest(tf.test.TestCase):
       close_op.run()
 
       # Expect the operation to fail due to the queue being closed.
-      with self.assertRaisesRegexp(tf.errors.AbortedError, "is closed"):
+      with self.assertRaisesRegexp(tf.errors.CancelledError, "is closed"):
         enqueue_op.run()
 
   def testBlockingEnqueueToFullQueue(self):
@@ -1203,19 +1200,19 @@ class FIFOQueueTest(tf.test.TestCase):
         enq_q.dequeue().eval()
 
   def _blockingDequeue(self, sess, dequeue_op):
-    with self.assertRaisesOpError("Dequeue operation was cancelled"):
+    with self.assertRaisesOpError("was cancelled"):
       sess.run(dequeue_op)
 
   def _blockingDequeueMany(self, sess, dequeue_many_op):
-    with self.assertRaisesOpError("Dequeue operation was cancelled"):
+    with self.assertRaisesOpError("was cancelled"):
       sess.run(dequeue_many_op)
 
   def _blockingEnqueue(self, sess, enqueue_op):
-    with self.assertRaisesOpError("Enqueue operation was cancelled"):
+    with self.assertRaisesOpError("was cancelled"):
       sess.run(enqueue_op)
 
   def _blockingEnqueueMany(self, sess, enqueue_many_op):
-    with self.assertRaisesOpError("Enqueue operation was cancelled"):
+    with self.assertRaisesOpError("was cancelled"):
       sess.run(enqueue_many_op)
 
   def testResetOfBlockingOperation(self):
@@ -1355,7 +1352,6 @@ class FIFOQueueDictTest(tf.test.TestCase):
       q = tf.FIFOQueue(5, (tf.int32, tf.float32), names=("i", "j"),
                        shared_name="foo", name="Q")
     self.assertTrue(isinstance(q.queue_ref, tf.Tensor))
-    self.assertEquals(tf.string_ref, q.queue_ref.dtype)
     self.assertProtoEquals("""
       name:'Q' op:'FIFOQueue'
       attr { key: 'component_types' value { list {
@@ -1374,7 +1370,6 @@ class FIFOQueueDictTest(tf.test.TestCase):
                        shapes=(tf.TensorShape([1, 1, 2, 3]),
                                tf.TensorShape([5, 8])), name="Q")
     self.assertTrue(isinstance(q.queue_ref, tf.Tensor))
-    self.assertEquals(tf.string_ref, q.queue_ref.dtype)
     self.assertProtoEquals("""
       name:'Q' op:'FIFOQueue'
       attr { key: 'component_types' value { list {
@@ -1512,6 +1507,23 @@ class FIFOQueueWithTimeoutTest(tf.test.TestCase):
                                    "Timed out waiting for notification"):
         sess.run(dequeued_t)
 
+  def testReusableAfterTimeout(self):
+    with self.test_session() as sess:
+      q = tf.FIFOQueue(10, tf.float32)
+      dequeued_t = q.dequeue()
+      enqueue_op = q.enqueue(37)
+
+      with self.assertRaisesRegexp(tf.errors.DeadlineExceededError,
+                                   "Timed out waiting for notification"):
+        sess.run(dequeued_t, options=tf.RunOptions(timeout_in_ms=10))
+
+      with self.assertRaisesRegexp(tf.errors.DeadlineExceededError,
+                                   "Timed out waiting for notification"):
+        sess.run(dequeued_t, options=tf.RunOptions(timeout_in_ms=10))
+
+      sess.run(enqueue_op)
+      self.assertEqual(37, sess.run(dequeued_t))
+
 
 class QueueContainerTest(tf.test.TestCase):
 
@@ -1521,6 +1533,52 @@ class QueueContainerTest(tf.test.TestCase):
         q = tf.FIFOQueue(10, tf.float32)
     self.assertEqual(tf.compat.as_bytes("test"),
                      q.queue_ref.op.get_attr("container"))
+
+
+class FIFOQueueBenchmark(tf.test.Benchmark):
+  """Benchmark FIFOQueue operations."""
+
+  def _build_graph(self):
+    """Builds a graph that enqueues and dequeues a single float.
+
+    Returns:
+      A tuple with the graph init tensor and graph output tensor.
+    """
+    q = tf.FIFOQueue(1, "float")
+    init = q.enqueue(1.0)
+    x = q.dequeue()
+    q_inc = q.enqueue(x + 1)
+    return init, q_inc
+
+  # TODO(suharshs): Add benchmarks for:
+  #   - different capacities of the queue
+  #   - various sizes of tensors
+  #   - enqueue_many, dequeue_many
+  def _run(self, num_iters):
+    """Benchmarks enqueueing and dequeueing from a FIFOQueue.
+
+    Args:
+      num_iters: The number of iterations to run.
+
+    Returns:
+      The duration of the run in seconds.
+    """
+    graph = tf.Graph()
+    with graph.as_default():
+      init, output = self._build_graph()
+    with tf.Session(graph=graph) as session:
+      init.run()
+      _ = session.run(output)  # warm up.
+      start_time = time.time()
+      for _ in range(num_iters):
+        _ = session.run(output)
+      duration = time.time() - start_time
+    print("%f secs per enqueue-dequeue" % (duration / num_iters))
+
+    self.report_benchmark(
+        name="fifo_queue", iters=num_iters, wall_time=duration / num_iters)
+
+    return duration
 
 
 if __name__ == "__main__":

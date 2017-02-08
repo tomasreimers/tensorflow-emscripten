@@ -18,23 +18,26 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import inspect
-
 import six
 
 from tensorflow.contrib import losses
 from tensorflow.contrib import metrics as metrics_lib
-from tensorflow.python.framework import dtypes
+from tensorflow.contrib.framework import deprecated
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import logging_ops
+from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn
 
 
+@deprecated(
+    "2016-11-12",
+    "This file will be removed after the deprecation date."
+    "Please switch to "
+    "third_party/tensorflow/contrib/learn/python/learn/estimators/head.py")
 def regression_target(label_name=None,
                       weight_column_name=None,
-                      target_dimension=1):
+                      label_dimension=1):
   """Creates a _TargetColumn for linear regression.
 
   Args:
@@ -43,7 +46,7 @@ def regression_target(label_name=None,
     weight_column_name: A string defining feature column name representing
       weights. It is used to down weight or boost examples during training. It
       will be multiplied by the loss of the example.
-    target_dimension: dimension of the target for multilabels.
+    label_dimension: dimension of the target for multilabels.
 
   Returns:
     An instance of _TargetColumn
@@ -51,11 +54,16 @@ def regression_target(label_name=None,
   return _RegressionTargetColumn(loss_fn=_mean_squared_loss,
                                  label_name=label_name,
                                  weight_column_name=weight_column_name,
-                                 target_dimension=target_dimension)
+                                 label_dimension=label_dimension)
 
 # TODO(zakaria): Add logistic_regression_target
 
 
+@deprecated(
+    "2016-11-12",
+    "This file will be removed after the deprecation date."
+    "Please switch to "
+    "third_party/tensorflow/contrib/learn/python/learn/estimators/head.py")
 def multi_class_target(n_classes, label_name=None, weight_column_name=None):
   """Creates a _TargetColumn for multi class single label classification.
 
@@ -87,6 +95,11 @@ def multi_class_target(n_classes, label_name=None, weight_column_name=None):
                                  weight_column_name=weight_column_name)
 
 
+@deprecated(
+    "2016-11-12",
+    "This file will be removed after the deprecation date."
+    "Please switch to "
+    "third_party/tensorflow/contrib/learn/python/learn/estimators/head.py")
 def binary_svm_target(label_name=None, weight_column_name=None):
   """Creates a _TargetColumn for binary classification with SVMs.
 
@@ -107,6 +120,18 @@ def binary_svm_target(label_name=None, weight_column_name=None):
                                 weight_column_name=weight_column_name)
 
 
+@deprecated(
+    "2016-11-12",
+    "This file will be removed after the deprecation date."
+    "Please switch to "
+    "third_party/tensorflow/contrib/learn/python/learn/estimators/head.py")
+class ProblemType(object):
+  UNSPECIFIED = 0
+  CLASSIFICATION = 1
+  LINEAR_REGRESSION = 2
+  LOGISTIC_REGRESSION = 3
+
+
 class _TargetColumn(object):
   """_TargetColumn is the abstraction for a single head in a model.
 
@@ -124,7 +149,7 @@ class _TargetColumn(object):
   """
 
   def __init__(self, loss_fn, num_label_columns, label_name,
-               weight_column_name):
+               weight_column_name, problem_type):
     if not loss_fn:
       raise ValueError("loss_fn must be provided")
     if num_label_columns is None:  # n_classes can be 0
@@ -134,12 +159,13 @@ class _TargetColumn(object):
     self._num_label_columns = num_label_columns
     self._label_name = label_name
     self._weight_column_name = weight_column_name
+    self._problem_type = problem_type
 
   def logits_to_predictions(self, logits, proba=False):
     # Abstrat, Subclasses must implement.
     raise NotImplementedError()
 
-  def get_eval_ops(self, features, logits, targets, metrics=None):
+  def get_eval_ops(self, features, logits, labels, metrics=None):
     """Returns eval op."""
     raise NotImplementedError
 
@@ -163,8 +189,54 @@ class _TargetColumn(object):
           math_ops.to_float(features[self._weight_column_name]),
           shape=(-1,))
 
+  @property
+  def problem_type(self):
+    return self._problem_type
+
+  def _weighted_loss(self, loss, weight_tensor):
+    """Returns cumulative weighted loss."""
+    unweighted_loss = array_ops.reshape(loss, shape=(-1,))
+    weighted_loss = math_ops.mul(unweighted_loss,
+                                 array_ops.reshape(
+                                     weight_tensor, shape=(-1,)))
+    return weighted_loss
+
+  def training_loss(self, logits, target, features, name="training_loss"):
+    """Returns training loss tensor for this head.
+
+    Training loss is different from the loss reported on the tensorboard as we
+    should respect the example weights when computing the gradient.
+
+      L = sum_{i} w_{i} * l_{i} / B
+
+    where B is the number of examples in the batch, l_{i}, w_{i} are individual
+    losses, and example weight.
+
+    Args:
+      logits: logits, a float tensor.
+      target: either a tensor for labels or in multihead case, a dict of string
+        to target tensor.
+      features: features dict.
+      name: Op name.
+
+    Returns:
+      Loss tensor.
+    """
+    target = target[self.name] if isinstance(target, dict) else target
+    loss_unweighted = self._loss_fn(logits, target)
+
+    weight_tensor = self.get_weight_tensor(features)
+    if weight_tensor is None:
+      return math_ops.reduce_mean(loss_unweighted, name=name)
+    loss_weighted = self._weighted_loss(loss_unweighted, weight_tensor)
+    return math_ops.reduce_mean(loss_weighted, name=name)
+
   def loss(self, logits, target, features):
     """Returns loss tensor for this head.
+
+    The loss returned is the weighted average.
+
+      L = sum_{i} w_{i} * l_{i} / sum_{i} w_{i}
 
     Args:
       logits: logits, a float tensor.
@@ -181,38 +253,35 @@ class _TargetColumn(object):
     weight_tensor = self.get_weight_tensor(features)
     if weight_tensor is None:
       return math_ops.reduce_mean(loss_unweighted, name="loss")
-    else:
-      loss_unweighted = array_ops.reshape(loss_unweighted, shape=(-1,))
-      loss_weighted = math_ops.mul(
-          loss_unweighted,
-          array_ops.reshape(weight_tensor, shape=(-1,)))
-      return math_ops.div(
-          math_ops.reduce_sum(loss_weighted),
-          math_ops.to_float(math_ops.reduce_sum(weight_tensor)),
-          name="loss")
+    loss_weighted = self._weighted_loss(loss_unweighted, weight_tensor)
+    return math_ops.div(
+        math_ops.reduce_sum(loss_weighted),
+        math_ops.to_float(math_ops.reduce_sum(weight_tensor)),
+        name="loss")
 
 
 class _RegressionTargetColumn(_TargetColumn):
   """_TargetColumn for regression."""
 
-  def __init__(self, loss_fn, label_name, weight_column_name, target_dimension):
+  def __init__(self, loss_fn, label_name, weight_column_name, label_dimension):
     super(_RegressionTargetColumn, self).__init__(
         loss_fn=loss_fn,
-        num_label_columns=target_dimension,
+        num_label_columns=label_dimension,
         label_name=label_name,
-        weight_column_name=weight_column_name)
+        weight_column_name=weight_column_name,
+        problem_type=ProblemType.LINEAR_REGRESSION)
 
   def logits_to_predictions(self, logits, proba=False):
     if self.num_label_columns == 1:
       return array_ops.squeeze(logits, squeeze_dims=[1])
     return logits
 
-  def get_eval_ops(self, features, logits, targets, metrics=None):
-    loss = self.loss(logits, targets, features)
+  def get_eval_ops(self, features, logits, labels, metrics=None):
+    loss = self.loss(logits, labels, features)
     result = {"loss": metrics_lib.streaming_mean(loss)}
     if metrics:
       predictions = self.logits_to_predictions(logits, proba=False)
-      result.update(_run_metrics(predictions, targets, metrics,
+      result.update(_run_metrics(predictions, labels, metrics,
                                  self.get_weight_tensor(features)))
     return result
 
@@ -228,7 +297,8 @@ class _MultiClassTargetColumn(_TargetColumn):
         loss_fn=loss_fn,
         num_label_columns=1 if n_classes == 2 else n_classes,
         label_name=label_name,
-        weight_column_name=weight_column_name)
+        weight_column_name=weight_column_name,
+        problem_type=ProblemType.CLASSIFICATION)
 
   def logits_to_predictions(self, logits, proba=False):
     if self.num_label_columns == 1:
@@ -241,11 +311,11 @@ class _MultiClassTargetColumn(_TargetColumn):
 
   def _default_eval_metrics(self):
     if self._num_label_columns == 1:
-      return _get_default_binary_metrics_for_eval(thresholds=[.5])
+      return get_default_binary_metrics_for_eval(thresholds=[.5])
     return {}
 
-  def get_eval_ops(self, features, logits, targets, metrics=None):
-    loss = self.loss(logits, targets, features)
+  def get_eval_ops(self, features, logits, labels, metrics=None):
+    loss = self.loss(logits, labels, features)
     result = {"loss": metrics_lib.streaming_mean(loss)}
 
     # Adds default metrics.
@@ -255,11 +325,11 @@ class _MultiClassTargetColumn(_TargetColumn):
       metrics = {("accuracy", "classes"): metrics_lib.streaming_accuracy}
 
     predictions = math_ops.sigmoid(logits)
-    targets_float = math_ops.to_float(targets)
+    labels_float = math_ops.to_float(labels)
 
     default_metrics = self._default_eval_metrics()
     for metric_name, metric_op in default_metrics.items():
-      result[metric_name] = metric_op(predictions, targets_float)
+      result[metric_name] = metric_op(predictions, labels_float)
 
     class_metrics = {}
     proba_metrics = {}
@@ -284,11 +354,11 @@ class _MultiClassTargetColumn(_TargetColumn):
                          "form.".format(name))
     if class_metrics:
       class_predictions = self.logits_to_predictions(logits, proba=False)
-      result.update(_run_metrics(class_predictions, targets, class_metrics,
+      result.update(_run_metrics(class_predictions, labels, class_metrics,
                                  self.get_weight_tensor(features)))
     if proba_metrics:
       predictions = self.logits_to_predictions(logits, proba=True)
-      result.update(_run_metrics(predictions, targets, proba_metrics,
+      result.update(_run_metrics(predictions, labels, proba_metrics,
                                  self.get_weight_tensor(features)))
     return result
 
@@ -298,7 +368,7 @@ class _BinarySvmTargetColumn(_MultiClassTargetColumn):
 
   def __init__(self, label_name, weight_column_name):
     def loss_fn(logits, target):
-      check_shape_op = logging_ops.Assert(
+      check_shape_op = control_flow_ops.Assert(
           math_ops.less_equal(array_ops.rank(target), 2),
           ["target's shape should be either [batch_size, 1] or [batch_size]"])
       with ops.control_dependencies([check_shape_op]):
@@ -341,11 +411,9 @@ def _log_loss_with_two_classes(logits, target):
 
 
 def _softmax_cross_entropy_loss(logits, target):
-  # sigmoid_cross_entropy_with_logits requires [batch_size, 1] target.
-  # Check that we got int32/int64 for classification.
-  if (not target.dtype.is_compatible_with(dtypes.int64) and
-      not target.dtype.is_compatible_with(dtypes.int32)):
-    raise ValueError("Target's dtype should be int32, int64 or compatible. "
+  # Check that we got integer for classification.
+  if not target.dtype.is_integer:
+    raise ValueError("Target's dtype should be integer "
                      "Instead got %s." % target.dtype)
   # sparse_softmax_cross_entropy_with_logits requires [batch_size] target.
   if len(target.get_shape()) == 2:
@@ -354,19 +422,24 @@ def _softmax_cross_entropy_loss(logits, target):
   return loss_vec
 
 
-def _run_metrics(predictions, targets, metrics, weights):
+def _run_metrics(predictions, labels, metrics, weights):
   result = {}
-  targets = math_ops.cast(targets, predictions.dtype)
+  labels = math_ops.cast(labels, predictions.dtype)
   for name, metric in six.iteritems(metrics or {}):
-    if "weights" in inspect.getargspec(metric)[0]:
-      result[name] = metric(predictions, targets, weights=weights)
+    if weights is not None:
+      result[name] = metric(predictions, labels, weights=weights)
     else:
-      result[name] = metric(predictions, targets)
+      result[name] = metric(predictions, labels)
 
   return result
 
 
-def _get_default_binary_metrics_for_eval(thresholds):
+@deprecated(
+    "2016-11-12",
+    "This file will be removed after the deprecation date."
+    "Please switch to "
+    "third_party/tensorflow/contrib/learn/python/learn/estimators/head.py")
+def get_default_binary_metrics_for_eval(thresholds):
   """Returns a dictionary of basic metrics for logistic regression.
 
   Args:
@@ -378,41 +451,64 @@ def _get_default_binary_metrics_for_eval(thresholds):
   """
   metrics = {}
   metrics[_MetricKeys.PREDICTION_MEAN] = _predictions_streaming_mean
-  metrics[_MetricKeys.TARGET_MEAN] = _targets_streaming_mean
+  metrics[_MetricKeys.TARGET_MEAN] = _labels_streaming_mean
   # Also include the streaming mean of the label as an accuracy baseline, as
   # a reminder to users.
-  metrics[_MetricKeys.ACCURACY_BASELINE] = _targets_streaming_mean
+  metrics[_MetricKeys.ACCURACY_BASELINE] = _labels_streaming_mean
 
-  metrics[_MetricKeys.AUC] = metrics_lib.streaming_auc
+  metrics[_MetricKeys.AUC] = _streaming_auc
 
   for threshold in thresholds:
-    metrics[_MetricKeys.ACCURACY_MEAN % threshold] = _streaming_with_threshold(
-        metrics_lib.streaming_accuracy, threshold)
+    metrics[_MetricKeys.ACCURACY_MEAN % threshold] = _accuracy_at_threshold(
+        threshold)
     # Precision for positive examples.
-    metrics[_MetricKeys.PRECISION_MEAN % threshold] = _streaming_with_threshold(
-        metrics_lib.streaming_precision, threshold)
+    metrics[_MetricKeys.PRECISION_MEAN % threshold] = _streaming_at_threshold(
+        metrics_lib.streaming_precision_at_thresholds, threshold)
     # Recall for positive examples.
-    metrics[_MetricKeys.RECALL_MEAN % threshold] = _streaming_with_threshold(
-        metrics_lib.streaming_recall, threshold)
+    metrics[_MetricKeys.RECALL_MEAN % threshold] = _streaming_at_threshold(
+        metrics_lib.streaming_recall_at_thresholds, threshold)
 
   return metrics
 
 
-# TODO(zakaria): support weights.
-def _targets_streaming_mean(unused_predictions, targets):
-  return metrics_lib.streaming_mean(targets)
+def _float_weights_or_none(weights):
+  if weights is None:
+    return None
+  return math_ops.to_float(weights)
 
 
-def _predictions_streaming_mean(predictions, unused_targets):
-  return metrics_lib.streaming_mean(predictions)
+def _labels_streaming_mean(unused_predictions, labels, weights=None):
+  return metrics_lib.streaming_mean(labels, weights=weights)
 
 
-def _streaming_with_threshold(streaming_metrics_fn, threshold):
+def _predictions_streaming_mean(predictions, unused_labels, weights=None):
+  return metrics_lib.streaming_mean(predictions, weights=weights)
 
-  def _streaming_metrics(predictions, targets):
-    return streaming_metrics_fn(predictions=math_ops.to_float(
-        math_ops.greater_equal(predictions, threshold)),
-                                labels=targets)
+
+def _streaming_auc(predictions, labels, weights=None):
+  return metrics_lib.streaming_auc(predictions, labels,
+                                   weights=_float_weights_or_none(weights))
+
+
+def _accuracy_at_threshold(threshold):
+
+  def _accuracy_metric(predictions, labels, weights=None):
+    threshold_predictions = math_ops.to_float(
+        math_ops.greater_equal(predictions, threshold))
+    return metrics_lib.streaming_accuracy(predictions=threshold_predictions,
+                                          labels=labels,
+                                          weights=weights)
+
+  return _accuracy_metric
+
+
+def _streaming_at_threshold(streaming_metrics_fn, threshold):
+
+  def _streaming_metrics(predictions, labels, weights=None):
+    precision_tensor, update_op = streaming_metrics_fn(
+        predictions, labels=labels, thresholds=[threshold],
+        weights=_float_weights_or_none(weights))
+    return array_ops.squeeze(precision_tensor), update_op
 
   return _streaming_metrics
 

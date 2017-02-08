@@ -78,7 +78,7 @@ model).
 
 Word2vec is a particularly computationally-efficient predictive model for
 learning word embeddings from raw text. It comes in two flavors, the Continuous
-Bag-of-Words model (CBOW) and the Skip-Gram model (Chapter 3.1 and 3.2 in [Mikolov et al.](http://arxiv.org/pdf/1301.3781.pdf)). Algorithmically, these
+Bag-of-Words model (CBOW) and the Skip-Gram model (Section 3.1 and 3.2 in [Mikolov et al.](http://arxiv.org/pdf/1301.3781.pdf)). Algorithmically, these
 models are similar, except that CBOW predicts target words (e.g. 'mat') from
 source context words ('the cat sits on the'), while the skip-gram does the
 inverse and predicts source context-words from the target words. This inversion
@@ -227,7 +227,7 @@ When we inspect these visualizations it becomes apparent that the vectors
 capture some general, and in fact quite useful, semantic information about
 words and their relationships to one another. It was very interesting when we
 first discovered that certain directions in the induced vector space specialize
-towards certain semantic relationships, e.g. *male-female*, *gender* and
+towards certain semantic relationships, e.g. *male-female*, *verb tense* and
 even *country-capital* relationships between words, as illustrated in the figure
 below (see also for example
 [Mikolov et al., 2013](http://www.aclweb.org/anthology/N13-1090)).

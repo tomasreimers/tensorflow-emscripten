@@ -19,7 +19,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from tensorflow.contrib.slim.python.slim.nets import overfeat
+from tensorflow.contrib.slim.nets import overfeat
 
 slim = tf.contrib.slim
 
@@ -137,7 +137,7 @@ class OverFeatTest(tf.test.TestCase):
     with self.test_session() as sess:
       inputs = tf.random_uniform((batch_size, height, width, 3))
       logits, _ = overfeat.overfeat(inputs)
-      sess.run(tf.initialize_all_variables())
+      sess.run(tf.global_variables_initializer())
       output = sess.run(logits)
       self.assertTrue(output.any())
 

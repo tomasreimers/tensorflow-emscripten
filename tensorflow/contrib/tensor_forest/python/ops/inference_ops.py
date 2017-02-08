@@ -21,7 +21,6 @@ import threading
 
 from tensorflow.python.framework import load_library
 from tensorflow.python.framework import ops
-from tensorflow.python.framework import tensor_shape
 from tensorflow.python.platform import resource_loader
 from tensorflow.python.platform import tf_logging as logging
 
@@ -32,21 +31,9 @@ _inference_ops = None
 _ops_lock = threading.Lock()
 
 
-ops.NoGradient('TreePredictions')
-
-
-@ops.RegisterShape('TreePredictions')
-def TreePredictions(op):
-  """Shape function for TreePredictions Op."""
-  num_points = op.inputs[0].get_shape()[0].value
-  sparse_shape = op.inputs[3].get_shape()
-  if sparse_shape.ndims > 0:
-    num_points = None
-  num_classes = op.inputs[7].get_shape()[1].value
-
-  # The output of TreePredictions is
-  # [node_pcw(evaluate_tree(x), c) for c in classes for x in input_data].
-  return [tensor_shape.TensorShape([num_points, num_classes - 1])]
+# TODO(b/31222613): This op may be differentiable, and there may be
+# latent bugs here.
+ops.NotDifferentiable('TreePredictions')
 
 
 # Workaround for the fact that importing tensorflow imports contrib

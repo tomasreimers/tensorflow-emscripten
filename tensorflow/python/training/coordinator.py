@@ -352,6 +352,9 @@ class Coordinator(object):
         threads = self._registered_threads
       else:
         threads = self._registered_threads.union(set(threads))
+      # Copy the set into a list to avoid race conditions where a new thread
+      # is added while we are waiting.
+      threads = list(threads)
 
     # Wait for all threads to stop or for request_stop() to be called.
     while any(t.is_alive() for t in threads) and not self.wait_for_stop(1.0):
@@ -389,6 +392,12 @@ class Coordinator(object):
   @property
   def joined(self):
     return self._joined
+
+  def raise_requested_exception(self):
+    """If an exception has been passed to `request_stop`, this raises it."""
+    with self._lock:
+      if self._exc_info_to_raise:
+        six.reraise(*self._exc_info_to_raise)
 
 
 # Threads for the standard services.

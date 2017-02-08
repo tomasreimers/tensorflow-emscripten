@@ -1,4 +1,4 @@
-// Copyright 2016 Google Inc. All Rights Reserved.
+// Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 
 #include "tensorflow/contrib/tensor_forest/core/ops/tree_utils.h"
 
+#include "tensorflow/core/framework/common_shape_fns.h"
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/lib/strings/numbers.h"
@@ -48,12 +49,11 @@ void Evaluate(const Tensor& input_data, Tensor output_data,
   }
 }
 
-
 REGISTER_OP("StringToFloat")
-  .Input("input_data: string")
-  .Output("output_data: float")
-
-  .Doc(R"doc(
+    .Input("input_data: string")
+    .Output("output_data: float")
+    .SetShapeFn(shape_inference::UnchangedShape)
+    .Doc(R"doc(
    Converts byte arrays represented by strings to 32-bit
    floating point numbers. The output numbers themselves are meaningless, and
    should only be used in == comparisons.

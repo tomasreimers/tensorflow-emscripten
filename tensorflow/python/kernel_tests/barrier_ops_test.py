@@ -36,7 +36,6 @@ class BarrierTest(tf.test.TestCase):
           shared_name="B",
           name="B")
     self.assertTrue(isinstance(b.barrier_ref, tf.Tensor))
-    self.assertEquals(tf.string_ref, b.barrier_ref.dtype)
     self.assertProtoEquals("""
       name:'B' op:'Barrier'
       attr {
@@ -499,6 +498,19 @@ class BarrierTest(tf.test.TestCase):
       with self.assertRaisesOpError("is closed and has insufficient elements"):
         sess.run(take_t[0])
 
+  def _testClosedEmptyBarrierTakeManyAllowSmallBatchRaises(self, cancel):
+    with self.test_session() as sess:
+      b = data_flow_ops.Barrier(
+          (tf.float32, tf.float32), shapes=((), ()), name="B")
+      take_t = b.take_many(1, allow_small_batch=True)
+      sess.run(b.close(cancel))
+      with self.assertRaisesOpError("is closed and has insufficient elements"):
+        sess.run(take_t)
+
+  def testClosedEmptyBarrierTakeManyAllowSmallBatchRaises(self):
+    self._testClosedEmptyBarrierTakeManyAllowSmallBatchRaises(cancel=False)
+    self._testClosedEmptyBarrierTakeManyAllowSmallBatchRaises(cancel=True)
+
   def _testParallelInsertManyTakeManyCloseHalfwayThrough(self, cancel):
     with self.test_session() as sess:
       b = data_flow_ops.Barrier(
@@ -529,7 +541,7 @@ class BarrierTest(tf.test.TestCase):
       def insert(sess, i):
         try:
           sess.run([insert_0_ops[i], insert_1_ops[i]])
-        except tf.errors.AbortedError:
+        except tf.errors.CancelledError:
           pass
 
       taken = []
@@ -613,7 +625,7 @@ class BarrierTest(tf.test.TestCase):
         if cancel:
           try:
             insert_1_ops[i].run(session=sess)
-          except tf.errors.AbortedError:
+          except tf.errors.CancelledError:
             pass
         else:
           insert_1_ops[i].run(session=sess)

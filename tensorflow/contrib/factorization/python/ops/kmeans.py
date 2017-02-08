@@ -28,7 +28,7 @@ from tensorflow.contrib.learn.python.learn.estimators import estimator
 from tensorflow.contrib.learn.python.learn.estimators._sklearn import TransformerMixin
 from tensorflow.contrib.learn.python.learn.learn_io import data_feeder
 from tensorflow.contrib.learn.python.learn.monitors import BaseMonitor
-from tensorflow.contrib.learn.python.learn.utils import checkpoints
+from tensorflow.python.ops import array_ops
 from tensorflow.python.ops.control_flow_ops import with_dependencies
 
 SQUARED_EUCLIDEAN_DISTANCE = clustering_ops.SQUARED_EUCLIDEAN_DISTANCE
@@ -177,8 +177,10 @@ class KMeansClustering(estimator.Estimator,
     Returns:
       Array with same number of rows as x, containing cluster ids.
     """
-    return super(KMeansClustering, self).predict(
-        x=x, batch_size=batch_size)[KMeansClustering.CLUSTER_IDX]
+    return np.array([
+        prediction[KMeansClustering.CLUSTER_IDX] for prediction in
+        super(KMeansClustering, self).predict(
+            x=x, batch_size=batch_size, as_iterable=True)])
 
   def score(self, x, batch_size=None):
     """Predict total sum of distances to nearest clusters.
@@ -212,19 +214,26 @@ class KMeansClustering(estimator.Estimator,
       Array with same number of rows as x, and num_clusters columns, containing
       distances to the cluster centers.
     """
-    return super(KMeansClustering, self).predict(
-        x=x, batch_size=batch_size)[KMeansClustering.ALL_SCORES]
+    return np.array([
+        prediction[KMeansClustering.ALL_SCORES] for prediction in
+        super(KMeansClustering, self).predict(
+            x=x, batch_size=batch_size, as_iterable=True)])
 
   def clusters(self):
     """Returns cluster centers."""
-    return checkpoints.load_variable(self.model_dir, self.CLUSTERS)
+    return tf.contrib.framework.load_variable(self.model_dir, self.CLUSTERS)
+
+  def _parse_tensor_or_dict(self, features):
+    if isinstance(features, dict):
+      return array_ops.concat(1, [features[k] for k in sorted(features.keys())])
+    return features
 
   def _get_train_ops(self, features, _):
     (_,
      _,
      losses,
      training_op) = clustering_ops.KMeans(
-         features,
+         self._parse_tensor_or_dict(features),
          self._num_clusters,
          self._training_initial_clusters,
          self._distance_metric,
@@ -234,6 +243,7 @@ class KMeansClustering(estimator.Estimator,
      ).training_graph()
     incr_step = tf.assign_add(tf.contrib.framework.get_global_step(), 1)
     self._loss = tf.reduce_sum(losses)
+    tf.scalar_summary('loss/raw', self._loss)
     training_op = with_dependencies([training_op, incr_step], self._loss)
     return training_op, self._loss
 
@@ -242,7 +252,7 @@ class KMeansClustering(estimator.Estimator,
      model_predictions,
      _,
      _) = clustering_ops.KMeans(
-         features,
+         self._parse_tensor_or_dict(features),
          self._num_clusters,
          self._training_initial_clusters,
          self._distance_metric,
@@ -260,7 +270,7 @@ class KMeansClustering(estimator.Estimator,
      _,
      losses,
      _) = clustering_ops.KMeans(
-         features,
+         self._parse_tensor_or_dict(features),
          self._num_clusters,
          self._training_initial_clusters,
          self._distance_metric,

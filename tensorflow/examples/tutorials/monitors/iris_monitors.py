@@ -28,10 +28,10 @@ IRIS_TRAINING = "iris_training.csv"
 IRIS_TEST = "iris_test.csv"
 
 # Load datasets.
-training_set = tf.contrib.learn.datasets.base.load_csv(filename=IRIS_TRAINING,
-                                                       target_dtype=np.int)
-test_set = tf.contrib.learn.datasets.base.load_csv(filename=IRIS_TEST,
-                                                   target_dtype=np.int)
+training_set = tf.contrib.learn.datasets.base.load_csv_with_header(
+    filename=IRIS_TRAINING, target_dtype=np.int, features_dtype=np.float)
+test_set = tf.contrib.learn.datasets.base.load_csv_with_header(
+    filename=IRIS_TEST, target_dtype=np.int, features_dtype=np.float)
 
 validation_metrics = {"accuracy": tf.contrib.metrics.streaming_accuracy,
                       "precision": tf.contrib.metrics.streaming_precision,
@@ -45,8 +45,12 @@ validation_monitor = tf.contrib.learn.monitors.ValidationMonitor(
     early_stopping_metric_minimize=True,
     early_stopping_rounds=200)
 
+# Specify that all features have real-value data
+feature_columns = [tf.contrib.layers.real_valued_column("", dimension=4)]
+
 # Build 3 layer DNN with 10, 20, 10 units respectively.
-classifier = tf.contrib.learn.DNNClassifier(hidden_units=[10, 20, 10],
+classifier = tf.contrib.learn.DNNClassifier(feature_columns=feature_columns,
+                                            hidden_units=[10, 20, 10],
                                             n_classes=3,
                                             model_dir="/tmp/iris_model",
                                             config=tf.contrib.learn.RunConfig(
@@ -66,5 +70,5 @@ print("Accuracy: {0:f}".format(accuracy_score))
 # Classify two new flower samples.
 new_samples = np.array(
     [[6.4, 3.2, 4.5, 1.5], [5.8, 3.1, 5.0, 1.7]], dtype=float)
-y = classifier.predict(new_samples)
+y = list(classifier.predict(new_samples, as_iterable=True))
 print("Predictions: {}".format(str(y)))

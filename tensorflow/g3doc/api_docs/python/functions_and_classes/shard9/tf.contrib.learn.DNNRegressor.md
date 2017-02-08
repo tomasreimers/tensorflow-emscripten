@@ -3,24 +3,22 @@ A regressor for TensorFlow DNN models.
 Example:
 
 ```python
-education = sparse_column_with_hash_bucket(column_name="education",
-                                           hash_bucket_size=1000)
-occupation = sparse_column_with_hash_bucket(column_name="occupation",
-                                            hash_bucket_size=1000)
+sparse_feature_a = sparse_column_with_hash_bucket(...)
+sparse_feature_b = sparse_column_with_hash_bucket(...)
 
-education_emb = embedding_column(sparse_id_column=education, dimension=16,
-                                 combiner="sum")
-occupation_emb = embedding_column(sparse_id_column=occupation, dimension=16,
-                                 combiner="sum")
+sparse_feature_a_emb = embedding_column(sparse_id_column=sparse_feature_a,
+                                        ...)
+sparse_feature_b_emb = embedding_column(sparse_id_column=sparse_feature_b,
+                                        ...)
 
 estimator = DNNRegressor(
-    feature_columns=[education_emb, occupation_emb],
+    feature_columns=[sparse_feature_a, sparse_feature_b],
     hidden_units=[1024, 512, 256])
 
 # Or estimator using the ProximalAdagradOptimizer optimizer with
 # regularization.
 estimator = DNNRegressor(
-    feature_columns=[education_emb, occupation_emb],
+    feature_columns=[sparse_feature_a, sparse_feature_b],
     hidden_units=[1024, 512, 256],
     optimizer=tf.train.ProximalAdagradOptimizer(
       learning_rate=0.1,
@@ -28,11 +26,11 @@ estimator = DNNRegressor(
     ))
 
 # Input builders
-def input_fn_train: # returns x, Y
+def input_fn_train: # returns x, y
   pass
 estimator.fit(input_fn=input_fn_train)
 
-def input_fn_eval: # returns x, Y
+def input_fn_eval: # returns x, y
   pass
 estimator.evaluate(input_fn=input_fn_eval)
 estimator.predict(x=x)
@@ -51,11 +49,9 @@ Input of `fit` and `evaluate` should have following features,
     Both features' `value` must be a `SparseTensor`.
   - if `column` is a `RealValuedColumn`, a feature with `key=column.name`
     whose `value` is a `Tensor`.
-  - if `feature_columns` is `None`, then `input` must contain only real
-    valued `Tensor`.
 - - -
 
-#### `tf.contrib.learn.DNNRegressor.__init__(hidden_units, feature_columns=None, model_dir=None, weight_column_name=None, optimizer=None, activation_fn=relu, dropout=None, gradient_clip_norm=None, enable_centered_bias=True, config=None)` {#DNNRegressor.__init__}
+#### `tf.contrib.learn.DNNRegressor.__init__(hidden_units, feature_columns, model_dir=None, weight_column_name=None, optimizer=None, activation_fn=relu, dropout=None, gradient_clip_norm=None, enable_centered_bias=False, config=None, feature_engineering_fn=None, label_dimension=1)` {#DNNRegressor.__init__}
 
 Initializes a `DNNRegressor` instance.
 
@@ -68,9 +64,9 @@ Initializes a `DNNRegressor` instance.
 *  <b>`feature_columns`</b>: An iterable containing all the feature columns used by
     the model. All items in the set should be instances of classes derived
     from `FeatureColumn`.
-*  <b>`model_dir`</b>: Directory to save model parameters, graph and etc. This can also
-    be used to load checkpoints from the directory into a estimator to continue
-    training a previously saved model.
+*  <b>`model_dir`</b>: Directory to save model parameters, graph and etc. This can
+    also be used to load checkpoints from the directory into a estimator to
+    continue training a previously saved model.
 *  <b>`weight_column_name`</b>: A string defining feature column name representing
     weights. It is used to down weight or boost examples during training. It
     will be multiplied by the loss of the example.
@@ -87,6 +83,11 @@ Initializes a `DNNRegressor` instance.
     bias variable for each class. Rest of the model structure learns the
     residual after centered bias.
 *  <b>`config`</b>: `RunConfig` object to configure the runtime settings.
+*  <b>`feature_engineering_fn`</b>: Feature engineering function. Takes features and
+                    labels which are the output of `input_fn` and
+                    returns features and labels which will be fed
+                    into the model.
+*  <b>`label_dimension`</b>: Dimension of the label for multilabels. Defaults to 1.
 
 ##### Returns:
 
@@ -95,7 +96,25 @@ Initializes a `DNNRegressor` instance.
 
 - - -
 
+#### `tf.contrib.learn.DNNRegressor.__repr__()` {#DNNRegressor.__repr__}
+
+
+
+
+- - -
+
 #### `tf.contrib.learn.DNNRegressor.bias_` {#DNNRegressor.bias_}
+
+DEPRECATED FUNCTION
+
+THIS FUNCTION IS DEPRECATED. It will be removed after 2016-10-30.
+Instructions for updating:
+This method will be removed after the deprecation date. To inspect variables, use get_variable_names() and get_variable_value().
+
+
+- - -
+
+#### `tf.contrib.learn.DNNRegressor.config` {#DNNRegressor.config}
 
 
 
@@ -104,39 +123,72 @@ Initializes a `DNNRegressor` instance.
 
 #### `tf.contrib.learn.DNNRegressor.dnn_bias_` {#DNNRegressor.dnn_bias_}
 
-Returns bias of deep neural network part.
+Returns bias of deep neural network part. (deprecated)
+
+THIS FUNCTION IS DEPRECATED. It will be removed after 2016-10-30.
+Instructions for updating:
+This method will be removed after the deprecation date. To inspect variables, use get_variable_names() and get_variable_value().
 
 
 - - -
 
 #### `tf.contrib.learn.DNNRegressor.dnn_weights_` {#DNNRegressor.dnn_weights_}
 
-Returns weights of deep neural network part.
+Returns weights of deep neural network part. (deprecated)
+
+THIS FUNCTION IS DEPRECATED. It will be removed after 2016-10-30.
+Instructions for updating:
+This method will be removed after the deprecation date. To inspect variables, use get_variable_names() and get_variable_value().
 
 
 - - -
 
-#### `tf.contrib.learn.DNNRegressor.evaluate(x=None, y=None, input_fn=None, feed_fn=None, batch_size=None, steps=None, metrics=None, name=None)` {#DNNRegressor.evaluate}
+#### `tf.contrib.learn.DNNRegressor.evaluate(*args, **kwargs)` {#DNNRegressor.evaluate}
 
-See `Evaluable`.
+See `Evaluable`. (deprecated arguments)
 
-##### Raises:
+SOME ARGUMENTS ARE DEPRECATED. They will be removed after 2016-12-01.
+Instructions for updating:
+Estimator is decoupled from Scikit Learn interface by moving into
+separate class SKCompat. Arguments x, y and batch_size are only
+available in the SKCompat class, Estimator will only accept input_fn.
+
+##### Example conversion:
+
+  est = Estimator(...) -> est = SKCompat(Estimator(...))
 
 
+*  <b>`Raises`</b>: 
 *  <b>`ValueError`</b>: If at least one of `x` or `y` is provided, and at least one of
-      `input_fn` or `feed_fn` is provided.
-      Or if `metrics` is not `None` or `dict`.
+          `input_fn` or `feed_fn` is provided.
+          Or if `metrics` is not `None` or `dict`.
 
 
 - - -
 
-#### `tf.contrib.learn.DNNRegressor.fit(x=None, y=None, input_fn=None, steps=None, batch_size=None, monitors=None, max_steps=None)` {#DNNRegressor.fit}
-
-See `Trainable`.
-
-##### Raises:
+#### `tf.contrib.learn.DNNRegressor.export(export_dir, input_fn=None, input_feature_key=None, use_deprecated_input_fn=True, signature_fn=None, default_batch_size=None, exports_to_keep=None)` {#DNNRegressor.export}
 
 
+
+
+- - -
+
+#### `tf.contrib.learn.DNNRegressor.fit(*args, **kwargs)` {#DNNRegressor.fit}
+
+See `Trainable`. (deprecated arguments)
+
+SOME ARGUMENTS ARE DEPRECATED. They will be removed after 2016-12-01.
+Instructions for updating:
+Estimator is decoupled from Scikit Learn interface by moving into
+separate class SKCompat. Arguments x, y and batch_size are only
+available in the SKCompat class, Estimator will only accept input_fn.
+
+##### Example conversion:
+
+  est = Estimator(...) -> est = SKCompat(Estimator(...))
+
+
+*  <b>`Raises`</b>: 
 *  <b>`ValueError`</b>: If `x` or `y` are not `None` while `input_fn` is not `None`.
 *  <b>`ValueError`</b>: If both `steps` and `max_steps` are not `None`.
 
@@ -192,14 +244,22 @@ Returns value of the variable given by name.
 
 #### `tf.contrib.learn.DNNRegressor.linear_bias_` {#DNNRegressor.linear_bias_}
 
-Returns bias of the linear part.
+Returns bias of the linear part. (deprecated)
+
+THIS FUNCTION IS DEPRECATED. It will be removed after 2016-10-30.
+Instructions for updating:
+This method will be removed after the deprecation date. To inspect variables, use get_variable_names() and get_variable_value().
 
 
 - - -
 
 #### `tf.contrib.learn.DNNRegressor.linear_weights_` {#DNNRegressor.linear_weights_}
 
-Returns weights per feature of the linear part.
+Returns weights per feature of the linear part. (deprecated)
+
+THIS FUNCTION IS DEPRECATED. It will be removed after 2016-10-30.
+Instructions for updating:
+This method will be removed after the deprecation date. To inspect variables, use get_variable_names() and get_variable_value().
 
 
 - - -
@@ -211,80 +271,66 @@ Returns weights per feature of the linear part.
 
 - - -
 
-#### `tf.contrib.learn.DNNRegressor.partial_fit(x=None, y=None, input_fn=None, steps=1, batch_size=None, monitors=None)` {#DNNRegressor.partial_fit}
+#### `tf.contrib.learn.DNNRegressor.partial_fit(*args, **kwargs)` {#DNNRegressor.partial_fit}
 
-Incremental fit on a batch of samples.
+Incremental fit on a batch of samples. (deprecated arguments)
 
-This method is expected to be called several times consecutively
-on different or the same chunks of the dataset. This either can
-implement iterative training or out-of-core/online training.
+SOME ARGUMENTS ARE DEPRECATED. They will be removed after 2016-12-01.
+Instructions for updating:
+Estimator is decoupled from Scikit Learn interface by moving into
+separate class SKCompat. Arguments x, y and batch_size are only
+available in the SKCompat class, Estimator will only accept input_fn.
 
-This is especially useful when the whole dataset is too big to
-fit in memory at the same time. Or when model is taking long time
-to converge, and you want to split up training into subparts.
+##### Example conversion:
 
-##### Args:
+  est = Estimator(...) -> est = SKCompat(Estimator(...))
+
+    This method is expected to be called several times consecutively
+    on different or the same chunks of the dataset. This either can
+    implement iterative training or out-of-core/online training.
+
+    This is especially useful when the whole dataset is too big to
+    fit in memory at the same time. Or when model is taking long time
+    to converge, and you want to split up training into subparts.
 
 
+*  <b>`Args`</b>: 
 *  <b>`x`</b>: Matrix of shape [n_samples, n_features...]. Can be iterator that
-     returns arrays of features. The training input samples for fitting the
-     model. If set, `input_fn` must be `None`.
+         returns arrays of features. The training input samples for fitting the
+         model. If set, `input_fn` must be `None`.
 *  <b>`y`</b>: Vector or matrix [n_samples] or [n_samples, n_outputs]. Can be
-     iterator that returns array of targets. The training target values
-     (class labels in classification, real numbers in regression). If set,
-     `input_fn` must be `None`.
+         iterator that returns array of labels. The training label values
+         (class labels in classification, real numbers in regression). If set,
+         `input_fn` must be `None`.
 *  <b>`input_fn`</b>: Input function. If set, `x`, `y`, and `batch_size` must be
-    `None`.
+        `None`.
 *  <b>`steps`</b>: Number of steps for which to train model. If `None`, train forever.
 *  <b>`batch_size`</b>: minibatch size to use on the input, defaults to first
-    dimension of `x`. Must be `None` if `input_fn` is provided.
+        dimension of `x`. Must be `None` if `input_fn` is provided.
 *  <b>`monitors`</b>: List of `BaseMonitor` subclass instances. Used for callbacks
-    inside the training loop.
-
-##### Returns:
-
-  `self`, for chaining.
-
-##### Raises:
+        inside the training loop.
 
 
+*  <b>`Returns`</b>: 
+      `self`, for chaining.
+
+
+*  <b>`Raises`</b>: 
 *  <b>`ValueError`</b>: If at least one of `x` and `y` is provided, and `input_fn` is
-      provided.
+          provided.
 
 
 - - -
 
-#### `tf.contrib.learn.DNNRegressor.predict(x=None, input_fn=None, batch_size=None, outputs=None, as_iterable=False)` {#DNNRegressor.predict}
+#### `tf.contrib.learn.DNNRegressor.predict(*args, **kwargs)` {#DNNRegressor.predict}
 
-Returns predictions for given features.
+Runs inference to determine the predicted class. (deprecated arguments)
 
-##### Args:
-
-
-*  <b>`x`</b>: Matrix of shape [n_samples, n_features...]. Can be iterator that
-     returns arrays of features. The training input samples for fitting the
-     model. If set, `input_fn` must be `None`.
-*  <b>`input_fn`</b>: Input function. If set, `x` and 'batch_size' must be `None`.
-*  <b>`batch_size`</b>: Override default batch size. If set, 'input_fn' must be
-    'None'.
-*  <b>`outputs`</b>: list of `str`, name of the output to predict.
-    If `None`, returns all.
-*  <b>`as_iterable`</b>: If True, return an iterable which keeps yielding predictions
-    for each example until inputs are exhausted. Note: The inputs must
-    terminate if you want the iterable to terminate (e.g. be sure to pass
-    num_epochs=1 if you are using something like read_batch_features).
-
-##### Returns:
-
-  A numpy array of predicted classes or regression values if the
-  constructor's `model_fn` returns a `Tensor` for `predictions` or a `dict`
-  of numpy arrays if `model_fn` returns a `dict`. Returns an iterable of
-  predictions if as_iterable is True.
-
-##### Raises:
-
-
-*  <b>`ValueError`</b>: If x and input_fn are both provided or both `None`.
+SOME ARGUMENTS ARE DEPRECATED. They will be removed after 2016-09-15.
+Instructions for updating:
+The default behavior of predict() is changing. The default value for
+as_iterable will change to True, and then the flag will be removed
+altogether. The behavior of this flag is described below.
 
 
 - - -
@@ -317,6 +363,10 @@ component of a nested object.
 
 #### `tf.contrib.learn.DNNRegressor.weights_` {#DNNRegressor.weights_}
 
+DEPRECATED FUNCTION
 
+THIS FUNCTION IS DEPRECATED. It will be removed after 2016-10-30.
+Instructions for updating:
+This method will be removed after the deprecation date. To inspect variables, use get_variable_names() and get_variable_value().
 
 

@@ -28,10 +28,10 @@ limitations under the License.
 
 namespace tensorflow {
 
-template <class Scalar, bool SupportsBatchOperation>
-class MatrixInverseOp : public LinearAlgebraOp<Scalar, SupportsBatchOperation> {
+template <class Scalar>
+class MatrixInverseOp : public LinearAlgebraOp<Scalar> {
  public:
-  typedef LinearAlgebraOp<Scalar, SupportsBatchOperation> Base;
+  typedef LinearAlgebraOp<Scalar> Base;
 
   explicit MatrixInverseOp(OpKernelConstruction* context) : Base(context) {
     OP_REQUIRES_OK(context, context->GetAttr("adjoint", &adjoint_));
@@ -52,7 +52,7 @@ class MatrixInverseOp : public LinearAlgebraOp<Scalar, SupportsBatchOperation> {
     Eigen::PartialPivLU<Matrix> lu_decomposition;
     if (adjoint_) {
       // TODO(rmlarsen): For Eigen 3.2, this creates a temporary copy.
-      // Make sure to backport: https://bitbucket.org/eigen/eigen/commits/ \
+      // Make sure to backport: https://bitbucket.org/eigen/eigen/commits/
       // bd2219a74c96dfe3f6bc2c23588749e36d2d8173
       lu_decomposition.compute(input.adjoint());
     } else {
@@ -77,10 +77,9 @@ class MatrixInverseOp : public LinearAlgebraOp<Scalar, SupportsBatchOperation> {
   TF_DISALLOW_COPY_AND_ASSIGN(MatrixInverseOp);
 };
 
-REGISTER_LINALG_OP("MatrixInverse", (MatrixInverseOp<float, false>), float);
-REGISTER_LINALG_OP("MatrixInverse", (MatrixInverseOp<double, false>), double);
-REGISTER_LINALG_OP("BatchMatrixInverse", (MatrixInverseOp<float, true>), float);
-REGISTER_LINALG_OP("BatchMatrixInverse", (MatrixInverseOp<double, true>),
-                   double);
+REGISTER_LINALG_OP("MatrixInverse", (MatrixInverseOp<float>), float);
+REGISTER_LINALG_OP("MatrixInverse", (MatrixInverseOp<double>), double);
+REGISTER_LINALG_OP("BatchMatrixInverse", (MatrixInverseOp<float>), float);
+REGISTER_LINALG_OP("BatchMatrixInverse", (MatrixInverseOp<double>), double);
 
 }  // namespace tensorflow

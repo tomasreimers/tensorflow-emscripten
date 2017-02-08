@@ -9,14 +9,6 @@ load("@local_config_cuda//cuda:platform.bzl", "readlink_command")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
-    name = "using_gcudacc",
-    values = {
-        "define": "using_cuda_gcudacc=true",
-    },
-    visibility = ["//visibility:public"],
-)
-
-config_setting(
     name = "using_nvcc",
     values = {
         "define": "using_cuda_nvcc=true",
@@ -66,10 +58,8 @@ cc_library(
     linkopts = [
         "-ldl",
         "-lpthread",
-    ] + select({
-        "@//tensorflow:darwin": [],
-        "//conditions:default": ["-lrt"],
-    }),
+        %{cudart_static_linkopt}
+    ],
     visibility = ["//visibility:public"],
 )
 
