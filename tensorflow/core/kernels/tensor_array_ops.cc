@@ -710,7 +710,7 @@ class TensorArrayConcatOp : public OpKernel {
     OP_REQUIRES_OK(ctx, ctx->allocate_output(
                             1, TensorShape({static_cast<int64>(values.size())}),
                             &lengths_tensor));
-    auto lengths_tensor_t = lengths_tensor->vec<int64>();
+    auto lengths_tensor_t = lengths_tensor->vec<Eigen::DenseIndex>();
 
     TensorShape output_shape;
     TensorShape output_shape_except0;
@@ -936,7 +936,7 @@ class TensorArrayUnpackOrScatterOp : public OpKernel {
 
     Eigen::DSizes<Eigen::DenseIndex, 3> indices{0, 0, 0};
     Eigen::DSizes<Eigen::DenseIndex, 3> sizes{1, 1,
-                                              element_shape.num_elements()};
+                                              static_cast<Eigen::DenseIndex>(element_shape.num_elements())};
 
     std::vector<PersistentTensor> write_values;
     write_values.reserve(num_values);
@@ -1049,10 +1049,10 @@ class TensorArraySplitOp : public OpKernel {
                     "Expected lengths to have < max int32 entries"));
 
     int32 num_tensors = static_cast<int32>(tensor_lengths->NumElements());
-    auto tensor_lengths_t = tensor_lengths->vec<int64>();
-    std::vector<int64> cumulative_lengths;
+    auto tensor_lengths_t = tensor_lengths->vec<Eigen::DenseIndex>();
+    std::vector<Eigen::DenseIndex> cumulative_lengths;
     cumulative_lengths.reserve(num_tensors);
-    int64 total_length = 0;
+    Eigen::DenseIndex total_length = 0;
     for (int i = 0; i < num_tensors; ++i) {
       total_length += tensor_lengths_t(i);
       cumulative_lengths.push_back(total_length);
@@ -1070,7 +1070,7 @@ class TensorArraySplitOp : public OpKernel {
                                 "values.shape[0], but sum of lengths is ",
                                 total_length, " and value's shape is: ",
                                 tensor_value->shape().DebugString()));
-    int64 elements_per_row =
+    Eigen::DenseIndex elements_per_row =
         (total_length == 0) ? 0 : (tensor_value->NumElements() / total_length);
 
     int32 array_size;
@@ -1111,7 +1111,7 @@ class TensorArraySplitOp : public OpKernel {
       Tensor* tensor_value_i;
       PersistentTensor persistent_tensor;
 
-      int64 previous_length = (i == 0) ? 0 : cumulative_lengths[i - 1];
+      Eigen::DenseIndex previous_length = (i == 0) ? 0 : cumulative_lengths[i - 1];
       Eigen::DSizes<Eigen::DenseIndex, 3> indices{0, previous_length, 0};
       Eigen::DSizes<Eigen::DenseIndex, 3> sizes{1, tensor_lengths_t(i),
                                                 elements_per_row};

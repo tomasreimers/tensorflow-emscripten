@@ -349,8 +349,7 @@ class SplitVOpGPU : public SplitVOpBase<GPUDevice, T, Tlen> {
                           SplitVOpCPU<type, len_type>);
 
 #define REGISTER_SPLIT_LEN(type) \
-  REGISTER_SPLIT(type, int32);   \
-  REGISTER_SPLIT(type, int64);
+  REGISTER_SPLIT(type, int32);
 
 TF_CALL_ALL_TYPES(REGISTER_SPLIT_LEN);
 
@@ -369,8 +368,7 @@ TF_CALL_ALL_TYPES(REGISTER_SPLIT_LEN);
                           SplitVOpGPU<type, len_type>);
 
 #define REGISTER_GPU_LEN(type) \
-  REGISTER_GPU(type, int32);   \
-  REGISTER_GPU(type, int64);
+  REGISTER_GPU(type, int32);
 
 TF_CALL_GPU_NUMBER_TYPES(REGISTER_GPU_LEN);
 REGISTER_GPU_LEN(bfloat16);
@@ -391,7 +389,6 @@ REGISTER_GPU_LEN(bfloat16);
                           SplitVOpCPU<int32, len_type>);
 
 REGISTER_GPU_int32(int32);
-REGISTER_GPU_int32(int64);
 
 #undef REGISTER_GPU_int32
 

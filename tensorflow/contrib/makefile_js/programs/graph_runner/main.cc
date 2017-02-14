@@ -36,6 +36,8 @@ limitations under the License.
 #ifdef __MAKEFILE_JS__
 #include <emscripten.h>
 #include <emscripten/bind.h>
+#else
+#include <streambuf>
 #endif
 
 #include "tensorflow/cc/ops/const_op.h"
@@ -187,29 +189,26 @@ std::string printDummyIntTensor(void) {
   return tp.SerializeAsString();
 }
 
-// int main(int argc, char* argv[]) {
-//   // if running in node, mount that directory
-//   #if defined(__MAKEFILE_JS__) && !defined(__MAKEFILE_JS_MAKE_HTML__)
-//     EM_ASM(
-//       FS.mkdir('/working');
-//       FS.mount(NODEFS, { root: '/' }, '/working');
-//     );
-//   #endif
-//
-//   test to see if this works
-//   JSSession sess("../../js-working-dir/io_graph.pb");
-//
-//   Tensor input(tensorflow::DT_INT32, tensorflow::TensorShape({1}));
-//   auto input_flat = input.flat<int32_t>();
-//   input_flat(0) = 5;
-//
-//   auto output = sess.run({{"i:0", input}}, {"o:0"});
-//
-//   LOG(INFO) << "Returned" << output[0].flat<int32_t>() << std::endl;
-//
-//   return 0;
-// };
+#ifndef __MAKEFILE_JS__
+int main(int argc, char* argv[]) {
+  std::ifstream t("../../js_working_directory/io_graph.pb");
+  std::string graph_str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
 
+  JSSession sess(graph_str);
+
+  Tensor input(tensorflow::DT_INT32, tensorflow::TensorShape({1}));
+  auto input_flat = input.flat<int32_t>();
+  input_flat(0) = 42;
+
+  auto output = sess.run({{"i:0", input}}, {"o:0"});
+
+  LOG(INFO) << "Returned " << output[0].flat<int32_t>() << std::endl;
+
+  return 0;
+};
+#endif
+
+#ifdef __MAKEFILE_JS__
 EMSCRIPTEN_BINDINGS(graph_runner) {
   emscripten::class_<JSSession>("JSSession")
     .constructor<std::string>()
@@ -231,3 +230,4 @@ EMSCRIPTEN_BINDINGS(graph_runner) {
   emscripten::register_vector<Tensor>("VectorTensor");
   emscripten::register_vector<std::pair<string, Tensor>>("VectorStringTensorPair");
 }
+#endif

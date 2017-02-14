@@ -20,13 +20,13 @@ bazel query 'kind("source file", deps(//tensorflow/core:android_tensorflow_lib))
 grep "//tensorflow/.*\.proto$" | \
 sed -E 's#^//##g' | \
 sed -E 's#:#/#g' \
-> tensorflow/contrib/makefile/tf_proto_files.txt
+> tensorflow/contrib/makefile_js/tf_proto_files.txt
 
 bazel query 'kind("generated file", deps(//tensorflow/core:proto_text))' | \
 grep "pb_text\.cc$" | \
 sed -E 's#^//##g' | \
 sed -E 's#:#/#g' \
-> tensorflow/contrib/makefile/tf_pb_text_files.txt
+> tensorflow/contrib/makefile_js/tf_pb_text_files.txt
 
 bazel query 'kind("source file", deps(//tensorflow/tools/proto_text:gen_proto_text_functions))' | \
 grep -E "//tensorflow/.*\.cc$" | \
@@ -34,20 +34,16 @@ grep -E -v "jpeg" | \
 grep -E -v "png" | \
 sed -E 's#^//##g' | \
 sed -E 's#:#/#g' \
-> tensorflow/contrib/makefile/proto_text_cc_files.txt
+> tensorflow/contrib/makefile_js/proto_text_cc_files.txt
 
 bazel query 'kind("generated file", deps(//tensorflow/tools/proto_text:gen_proto_text_functions))' | \
 grep -E "//tensorflow/.*\.cc$" | \
 sed -E 's#^//##g' | \
 sed -E 's#:#/#g' \
-> tensorflow/contrib/makefile/proto_text_pb_cc_files.txt
+> tensorflow/contrib/makefile_js/proto_text_pb_cc_files.txt
 
 bazel query 'kind("generated file", deps(//tensorflow/tools/proto_text:gen_proto_text_functions))' | \
 grep -E "//tensorflow/.*\.h$" | \
 sed -E 's#^//##g' | \
 sed -E 's#:#/#g' \
-> tensorflow/contrib/makefile/proto_text_pb_h_files.txt
-
-# Need to generate /bazel-genfiles/tensorflow/cc/* to compile the image label script
-bazel build "//tensorflow/cc:cc_ops"
-bazel build "//tensorflow/core:framework_internal"
+> tensorflow/contrib/makefile_js/proto_text_pb_h_files.txt

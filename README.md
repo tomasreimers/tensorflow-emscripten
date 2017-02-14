@@ -5,9 +5,16 @@
 
 *NOTE: This is still very much a work in progress, and not even fully operational. DO NOT DEPEND ON THIS PROJECT. I will post updates when it is working and stable.*
 
-This is a repository containing the source for Tensorflow (https://www.tensorflow.org/, pinned at version v0.10.0 currently) and slightly modified to be able to be compiled with Emscripten (https://kripken.github.io/emscripten-site/).
+This is a repository containing the source for Tensorflow (https://www.tensorflow.org/, pinned at version v0.12.0 currently) and slightly modified to be able to be compiled with Emscripten (https://kripken.github.io/emscripten-site/).
 
 ## Install & Compiling
+
+### Requirements
+ - Emscripten
+ - Protobufs (NOTE: Currently pinned at 3.1.0, TODO: Update to 3.2.0)
+ - Bazel
+
+### Downloading files
 
 Clone the repository. And download [js-working-dir](https://www.dropbox.com/s/y5snh95t7nri272/js-working-dir.zip?dl=0) into `./tensorflow/contrib/makefile_js/js-working-dir`.
 

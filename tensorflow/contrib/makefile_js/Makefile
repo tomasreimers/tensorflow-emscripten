@@ -36,9 +36,6 @@ HOST_OBJDIR := $(MAKEFILE_DIR)/gen/host_obj/
 HOST_BINDIR := $(MAKEFILE_DIR)/gen/host_bin/
 HOST_GENDIR := $(MAKEFILE_DIR)/gen/host_obj/
 
-# Find the current Eigen version from the Bazel configuration
-EIGEN_VERSION := $(shell grep eigen_version tensorflow/workspace.bzl | head -1 | sed -e 's/.*eigen_version.*=.*"\(.*\)"/\1/')
-
 # Settings for the host compiler.
 HOST_CXX := $(CC_PREFIX) gcc
 HOST_CXXFLAGS := --std=c++11
@@ -51,7 +48,8 @@ HOST_LDOPTS += -L/usr/local/lib
 HOST_INCLUDES := \
 -I. \
 -I$(MAKEFILE_DIR)/downloads/ \
--I$(MAKEFILE_DIR)/downloads/eigen-eigen-$(EIGEN_VERSION) \
+-I$(MAKEFILE_DIR)/downloads/eigen \
+-I$(MAKEFILE_DIR)/downloads/gemmlowp \
 -I$(HOST_GENDIR)
 ifeq ($(HAS_GEN_HOST_PROTOC),true)
 	HOST_INCLUDES += -I$(MAKEFILE_DIR)/gen/protobuf-host/include
@@ -71,12 +69,6 @@ HOST_LIBS := \
 ifeq ($(HOST_OS),LINUX)
 	HOST_LIBS += -ldl -lpthread
 endif
-
-# If we're on a Pi, link in pthreads and dl
-ifeq ($(HOST_OS),PI)
-	HOST_LIBS += -ldl -lpthread
-endif
-
 
 # proto_text is a tool that converts protobufs into a form we can use more
 # compactly within TensorFlow. It's a bit like protoc, but is designed to
@@ -120,15 +112,14 @@ ifeq ($(FINAL_PRODUCT),c)
 endif
 
 OPTFLAGS := -O2
-# if you'll need an arbitrary amount of memory, use -s ALLOW_MEMORY_GROWTH=1
-CFLAGS := -m64 -DIS_SLIM_BUILD $(OPTFLAGS)
+CFLAGS := -m64 -DIS_SLIM_BUILD -fexceptions -DNDEBUG -DNOTFDBG $(OPTFLAGS)
 
 ifeq ($(SINGLE_THREAD),true)
 	CFLAGS += -D__SINGLE_THREAD__
 endif
 
 ifneq (,$(filter $(FINAL_PRODUCT),html js))
-  CFLAGS += -D__MAKEFILE_JS__ -s USE_ZLIB=1 -s DEMANGLE_SUPPORT=1 -s ASSERTIONS=1
+  CFLAGS += -s USE_ZLIB=1 -D__MAKEFILE_JS__ -s DEMANGLE_SUPPORT=1 -s ASSERTIONS=1
 	ifeq ($(ALLOCATE_MEM_UPFRONT),true)
 		CFLAGS += -s TOTAL_MEMORY=1073741824
 	else
@@ -142,7 +133,7 @@ ifeq ($(FINAL_PRODUCT),html)
 	CFLAGS += -D__MAKEFILE_JS_MAKE_HTML__
 endif
 
-CXXFLAGS := --std=c++11 $(CFLAGS)
+CXXFLAGS := $(CFLAGS) --std=c++11
 LDFLAGS := \
 -L/usr/local/lib
 DEPFLAGS = -MT $@ -MMD -MP -m64 -MF $(DEPDIR)/$*.Td
@@ -150,13 +141,11 @@ DEPFLAGS = -MT $@ -MMD -MP -m64 -MF $(DEPDIR)/$*.Td
 INCLUDES := \
 -I. \
 -I$(MAKEFILE_DIR)/downloads/ \
--I$(MAKEFILE_DIR)/downloads/eigen-eigen-$(EIGEN_VERSION) \
+-I$(MAKEFILE_DIR)/downloads/eigen \
+-I$(MAKEFILE_DIR)/downloads/gemmlowp \
 -I$(PROTOGENDIR) \
 -I$(PBTGENDIR) \
--I./bazel-genfiles/ \
--I./bazel-tensorflow-final/external/png_archive/ \
--I./bazel-tensorflow-final/external/jpeg_archive/ \
--I./bazel-tensorflow-final/external/gif_archive/
+-I./bazel-genfiles/
 
 ifeq ($(HAS_GEN_HOST_PROTOC),true)
 	INCLUDES += -I$(MAKEFILE_DIR)/gen/protobuf-host/include
@@ -170,7 +159,7 @@ LIBS := \
 -lstdc++ \
 -lm
 
-ifeq ($(FINAL_PRODUCT), c)
+ifeq ($(FINAL_PRODUCT),c)
 LIBS += \
 -lprotobuf \
 -lz
@@ -196,11 +185,17 @@ ifeq ($(TARGET),OSX)
 endif
 # Make sure that we don't strip global constructors on Linux.
 ifeq ($(TARGET),LINUX)
-	LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
+ifeq ($(HAS_GEN_HOST_PROTOC),true)
+	# LIBFLAGS += -L$(MAKEFILE_DIR)/gen/protobuf-host/lib
+	# export LD_LIBRARY_PATH=$(MAKEFILE_DIR)/gen/protobuf-host/lib
+endif
+	# CXXFLAGS += -fPIC
+	# LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
+	# LDFLAGS := -Wl,--no-whole-archive
 endif
 # If we're on Linux, also link in the dl library.
 ifeq ($(TARGET),LINUX)
-	LIBS += -ldl -lpthread
+	# LIBS += -ldl -lpthread
 endif
 
 # This library is the main target for this makefile. It will contain a minimal
@@ -217,71 +212,27 @@ ifeq ($(FINAL_PRODUCT),c)
 	FINAL_EXTENSION := .o
 endif
 
-BENCHMARK_NAME := $(BINDIR)benchmark$(FINAL_EXTENSION)
-LABELER_NAME := $(BINDIR)labeler$(FINAL_EXTENSION)
-MNIST_NAME := $(BINDIR)mnist$(FINAL_EXTENSION)
 GR_NAME := $(BINDIR)graph_runner$(FINAL_EXTENSION)
 
 # What sources we want to compile, derived from the main Bazel build using the
 # gen_file_lists.sh script.
 
 CORE_CC_ALL_SRCS := \
+tensorflow/core/util/version_info.cc \
 $(wildcard tensorflow/core/*.cc) \
 $(wildcard tensorflow/core/common_runtime/*.cc) \
-$(wildcard tensorflow/core/debug/*.cc) \
 $(wildcard tensorflow/core/framework/*.cc) \
 $(wildcard tensorflow/core/graph/*.cc) \
 $(wildcard tensorflow/core/lib/*/*.cc) \
 $(wildcard tensorflow/core/platform/*.cc) \
 $(wildcard tensorflow/core/platform/*/*.cc) \
+$(wildcard tensorflow/core/platform/*/*/*.cc) \
 $(wildcard tensorflow/core/util/*.cc) \
-$(wildcard tensorflow/core/util/*/*.cc) \
-$(wildcard tensorflow/core/kernels/*.cc) \
-$(wildcard tensorflow/core/user_ops/*.cc) \
-$(wildcard tensorflow/cc/framework/*.cc) \
-$(wildcard tensorflow/cc/ops/*.cc) \
-$(wildcard bazel-genfiles/tensorflow/cc/ops/*.cc) \
-$(wildcard bazel-genfiles/tensorflow/core/kernels/*.cc)
+$(wildcard tensorflow/core/util/*/*.cc)
 
-CORE_C_ALL_SRCS := \
-$(wildcard bazel-tensorflow-final/external/gif_archive/giflib-5.1.4/lib/*.c) \
-$(wildcard bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/*.c) \
-$(wildcard bazel-tensorflow-final/external/png_archive/libpng-1.2.53/*.c)
-
-CORE_C_EXCLUDE_SRCS := \
-bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemdos.c \
-bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemmac.c \
-bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemansi.c \
-bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jmemname.c \
-bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/cjpeg.c \
-bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/djpeg.c \
-bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/jpegtran.c \
-bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/rdjpgcom.c \
-bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/wrjpgcom.c \
-bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/ckconfig.c \
-bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/example.c \
-$(wildcard bazel-tensorflow-final/external/jpeg_archive/jpeg-9a/*test.c) \
-bazel-tensorflow-final/external/png_archive/libpng-1.2.53/pngtest.c \
-
-## NB: To get that last line to work you need to run Bazel for the label_images
-
+# Remove duplicates (for version_info.cc)
+CORE_CC_ALL_SRCS := $(sort $(CORE_CC_ALL_SRCS))
 CORE_CC_EXCLUDE_SRCS := \
-$(wildcard tensorflow/cc/framework/*test.cc) \
-$(wildcard tensorflow/cc/framework/*main.cc) \
-$(wildcard tensorflow/cc/ops/*test.cc) \
-$(wildcard tensorflow/cc/ops/*main.cc) \
-$(wildcard tensorflow/core/kernels/*test.cc) \
-$(wildcard tensorflow/core/kernels/*main.cc) \
-tensorflow/core/kernels/conv_grad_ops_3d.cc \
-tensorflow/core/kernels/debug_ops.cc \
-tensorflow/core/kernels/sparse_tensor_dense_matmul_op.cc \
-tensorflow/core/kernels/string_to_hash_bucket_op.cc \
-$(wildcard tensorflow/core/kernels/batch_matrix_*_op.cc) \
-tensorflow/core/kernels/draw_bounding_box_op.cc \
-tensorflow/core/kernels/resize_area_op.cc \
-tensorflow/core/kernels/resize_bicubic_op.cc \
-tensorflow/core/kernels/sparse_matmul_op.cc \
-tensorflow/core/kernels/tensor_array_ops.cc \
 $(wildcard tensorflow/core/*/*test.cc) \
 $(wildcard tensorflow/core/*/*testutil*) \
 $(wildcard tensorflow/core/*/*testlib*) \
@@ -290,17 +241,26 @@ $(wildcard tensorflow/core/*/*/*test.cc) \
 $(wildcard tensorflow/core/*/*/*testutil*) \
 $(wildcard tensorflow/core/*/*/*testlib*) \
 $(wildcard tensorflow/core/*/*/*main.cc) \
+$(wildcard tensorflow/core/debug/*.cc) \
 $(wildcard tensorflow/core/graph/dot.*) \
+$(wildcard tensorflow/core/lib/gif/*) \
+$(wildcard tensorflow/core/lib/io/zlib*) \
+$(wildcard tensorflow/core/lib/io/record*) \
+$(wildcard tensorflow/core/lib/jpeg/*) \
+$(wildcard tensorflow/core/lib/png/*) \
 $(wildcard tensorflow/core/util/events_writer.*) \
 $(wildcard tensorflow/core/util/reporter.*) \
 $(wildcard tensorflow/core/platform/default/stream_executor.*) \
 $(wildcard tensorflow/core/platform/default/test_benchmark.*) \
 $(wildcard tensorflow/core/platform/cuda.h) \
 $(wildcard tensorflow/core/platform/cloud/*) \
+$(wildcard tensorflow/core/platform/profile_utils/*) \
 $(wildcard tensorflow/core/platform/google/*) \
+$(wildcard tensorflow/core/platform/google/*/*) \
 $(wildcard tensorflow/core/platform/jpeg.*) \
 $(wildcard tensorflow/core/platform/png.*) \
 $(wildcard tensorflow/core/platform/stream_executor.*) \
+$(wildcard tensorflow/core/platform/windows/*) \
 $(wildcard tensorflow/core/user_ops/*.cu.cc) \
 $(wildcard tensorflow/core/common_runtime/gpu/*) \
 $(wildcard tensorflow/core/common_runtime/gpu_device_factory.*)
@@ -310,32 +270,20 @@ TF_CC_SRCS := $(filter-out $(CORE_CC_EXCLUDE_SRCS), $(CORE_CC_ALL_SRCS))
 
 # Add in any extra files that don't fit the patterns easily
 TF_CC_SRCS += tensorflow/core/common_runtime/gpu/gpu_tracer.cc
-TF_C_SRCS := $(filter-out $(CORE_C_EXCLUDE_SRCS), $(CORE_C_ALL_SRCS))
 
 # Also include the op and kernel definitions.
 TF_CC_SRCS += $(shell cat $(MAKEFILE_DIR)/tf_op_files.txt)
-TF_CC_SRCS := $(sort $(TF_CC_SRCS))
 PBT_CC_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_pb_text_files.txt)
 PROTO_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_proto_files.txt)
-BENCHMARK_SRCS := \
-tensorflow/core/util/reporter.cc \
-$(MAKEFILE_DIR)/programs/benchmark/benchmark_model.cc \
-$(MAKEFILE_DIR)/programs/benchmark/benchmark_model_main.cc
-LABELER_SRCS := $(MAKEFILE_DIR)/programs/labeler/main.cc
-MNIST_SRCS := $(MAKEFILE_DIR)/programs/mnist/main.cc
 GR_SRCS := $(MAKEFILE_DIR)/programs/graph_runner/main.cc
 
 # File names of the intermediate files target compilation generates.
 TF_CC_OBJS := $(addprefix $(OBJDIR), $(TF_CC_SRCS:.cc=.o))
-TF_CC_OBJS += $(addprefix $(OBJDIR), $(TF_C_SRCS:.c=.o))
 PBT_GEN_FILES := $(addprefix $(PBTGENDIR), $(PBT_CC_SRCS))
 PBT_OBJS := $(addprefix $(OBJDIR), $(PBT_CC_SRCS:.cc=.o))
 PROTO_CC_SRCS := $(addprefix $(PROTOGENDIR), $(PROTO_SRCS:.proto=.pb.cc))
 PROTO_OBJS := $(addprefix $(OBJDIR), $(PROTO_SRCS:.proto=.pb.o))
 LIB_OBJS := $(PROTO_OBJS) $(TF_CC_OBJS) $(PBT_OBJS)
-BENCHMARK_OBJS := $(addprefix $(OBJDIR), $(BENCHMARK_SRCS:.cc=.o))
-LABELER_OBJS := $(addprefix $(OBJDIR), $(LABELER_SRCS:.cc=.o))
-MNIST_OBJS := $(addprefix $(OBJDIR), $(MNIST_SRCS:.cc=.o))
 GR_OBJS := $(addprefix $(OBJDIR), $(GR_SRCS:.cc=.o))
 PROTOBUF_LIB := $(MAKEFILE_DIR)/downloads/protobuf-emscripten/src/.libs/libprotobuf.a
 
@@ -346,47 +294,30 @@ endif
 .PHONY: clean cleantarget
 
 # The target that's compiled if there's no command-line arguments.
-all: $(LIB_PATH) $(BENCHMARK_NAME) $(LABELER_NAME) $(MNIST_NAME) $(GR_NAME)
+all: $(LIB_PATH) $(GR_NAME)
 
 # Rules for target compilation.
+.phony_version_info:
+tensorflow/core/util/version_info.cc: .phony_version_info
+	tensorflow/tools/git/gen_git_source.sh $@
 
 # Gathers together all the objects we've compiled into a single '.a' archive. -- Not necessary because compile data in ourselves
 $(LIB_PATH): $(LIB_OBJS)
 	@mkdir -p $(dir $@)
 	$(AR) $(ARFLAGS) $(LIB_PATH) $(LIB_OBJS)
 
-$(BENCHMARK_NAME): $(BENCHMARK_OBJS) $(LIB_PATH)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) \
-	-o $(BENCHMARK_NAME) $(BENCHMARK_OBJS) \
-	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
-	$(PROTOBUF_LIB)
-
-$(LABELER_NAME): $(LABELER_OBJS) $(LIB_PATH)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) \
-	-o $(LABELER_NAME) $(LABELER_OBJS) \
-	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
-	$(PROTOBUF_LIB)
-
-$(MNIST_NAME): $(MNIST_OBJS) $(LIB_PATH)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) \
-	-o $(MNIST_NAME) $(MNIST_OBJS) \
-	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
-	$(PROTOBUF_LIB)
-
-#
-# TODO: FIND SOMEWAY TO MAKE THE BIND FLAG MORE MEANINGFUL
-#
+# for embind
+BIND_FLAG := --bind
+ifeq ($(FINAL_PRODUCT),c)
+	BIND_FLAG :=
+endif
 
 $(GR_NAME): $(GR_OBJS) $(LIB_PATH)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) \
 	-o $(GR_NAME) $(GR_OBJS) \
-	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
-	--bind \
-	$(PROTOBUF_LIB)
+	$(LIBFLAGS) $(PROTOBUF_LIB) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
+	$(BIND_FLAG)
 
 # Matches on the normal hand-written TensorFlow C++ source files.
 $(OBJDIR)%.o: %.cc | $(PBT_GEN_FILES)
@@ -459,6 +390,7 @@ $(HOST_GENDIR)%.pb.cc $(HOST_GENDIR)%.pb.h: %.proto
 # Gets rid of all generated files.
 clean:
 	rm -rf $(MAKEFILE_DIR)/gen
+	rm -rf tensorflow/core/util/version_info.cc
 
 # Gets rid of target files only, leaving the host alone. Also leaves the lib
 # directory untouched deliberately, so we can persist multiple architectures
