@@ -710,7 +710,7 @@ class TensorArrayConcatOp : public OpKernel {
     OP_REQUIRES_OK(ctx, ctx->allocate_output(
                             1, TensorShape({static_cast<int64>(values.size())}),
                             &lengths_tensor));
-    auto lengths_tensor_t = lengths_tensor->vec<Eigen::DenseIndex>();
+    auto lengths_tensor_t = lengths_tensor->vec<int64>();
 
     TensorShape output_shape;
     TensorShape output_shape_except0;
@@ -1049,12 +1049,12 @@ class TensorArraySplitOp : public OpKernel {
                     "Expected lengths to have < max int32 entries"));
 
     int32 num_tensors = static_cast<int32>(tensor_lengths->NumElements());
-    auto tensor_lengths_t = tensor_lengths->vec<Eigen::DenseIndex>();
+    auto tensor_lengths_t = tensor_lengths->vec<int64>();
     std::vector<Eigen::DenseIndex> cumulative_lengths;
     cumulative_lengths.reserve(num_tensors);
     Eigen::DenseIndex total_length = 0;
     for (int i = 0; i < num_tensors; ++i) {
-      total_length += tensor_lengths_t(i);
+      total_length += static_cast<Eigen::DenseIndex>(tensor_lengths_t(i));
       cumulative_lengths.push_back(total_length);
     }
 
@@ -1113,7 +1113,7 @@ class TensorArraySplitOp : public OpKernel {
 
       Eigen::DenseIndex previous_length = (i == 0) ? 0 : cumulative_lengths[i - 1];
       Eigen::DSizes<Eigen::DenseIndex, 3> indices{0, previous_length, 0};
-      Eigen::DSizes<Eigen::DenseIndex, 3> sizes{1, tensor_lengths_t(i),
+      Eigen::DSizes<Eigen::DenseIndex, 3> sizes{1, static_cast<Eigen::DenseIndex>(tensor_lengths_t(i)),
                                                 elements_per_row};
 
       OP_REQUIRES_OK(ctx, ctx->allocate_persistent(

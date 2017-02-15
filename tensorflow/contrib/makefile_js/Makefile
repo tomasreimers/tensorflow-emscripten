@@ -48,8 +48,8 @@ HOST_LDOPTS += -L/usr/local/lib
 HOST_INCLUDES := \
 -I. \
 -I$(MAKEFILE_DIR)/downloads/ \
--I$(MAKEFILE_DIR)/downloads/eigen \
--I$(MAKEFILE_DIR)/downloads/gemmlowp \
+-I$(MAKEFILE_DIR)/downloads/eigen/ \
+-I$(MAKEFILE_DIR)/downloads/gemmlowp/ \
 -I$(HOST_GENDIR)
 ifeq ($(HAS_GEN_HOST_PROTOC),true)
 	HOST_INCLUDES += -I$(MAKEFILE_DIR)/gen/protobuf-host/include
@@ -141,8 +141,8 @@ DEPFLAGS = -MT $@ -MMD -MP -m64 -MF $(DEPDIR)/$*.Td
 INCLUDES := \
 -I. \
 -I$(MAKEFILE_DIR)/downloads/ \
--I$(MAKEFILE_DIR)/downloads/eigen \
--I$(MAKEFILE_DIR)/downloads/gemmlowp \
+-I$(MAKEFILE_DIR)/downloads/eigen/ \
+-I$(MAKEFILE_DIR)/downloads/gemmlowp/ \
 -I$(PROTOGENDIR) \
 -I$(PBTGENDIR) \
 -I./bazel-genfiles/
@@ -316,7 +316,8 @@ $(GR_NAME): $(GR_OBJS) $(LIB_PATH)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) \
 	-o $(GR_NAME) $(GR_OBJS) \
-	$(LIBFLAGS) $(PROTOBUF_LIB) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
+	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
+	$(PROTOBUF_LIB) \
 	$(BIND_FLAG)
 
 # Matches on the normal hand-written TensorFlow C++ source files.

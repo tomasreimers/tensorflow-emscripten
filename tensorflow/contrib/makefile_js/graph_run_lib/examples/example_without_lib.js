@@ -20,7 +20,7 @@ function copy_array_to_vector(arr, vector) {
 }
 
 // read basic graph
-const graph_pb = fs.readFileSync("../js_working_directory/add_graph.pb", "utf8");
+const graph_pb = fs.readFileSync("../../js_working_directory/add_graph.pb", "utf8");
 
 // construct session
 const sess = new graph_runner.JSSession(graph_pb);
@@ -49,7 +49,7 @@ const results_vector = graph_runner.tensorVectorToStringVector(sess_results);
 
 const results = [];
 for (let ii = 0; ii < results_vector.size(); ii++) {
-  results.push(tensor.make_array(results_vector.get(ii)));
+  results.push(tensorjs.make_array(results_vector.get(ii)));
 }
 
 console.log(results);

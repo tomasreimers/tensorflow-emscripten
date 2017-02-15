@@ -41,7 +41,6 @@ limitations under the License.
 #endif
 
 #include "tensorflow/cc/ops/const_op.h"
-#include "tensorflow/cc/ops/image_ops.h"
 #include "tensorflow/cc/ops/standard_ops.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/tensor.h"
@@ -113,6 +112,7 @@ public:
     session.reset(tensorflow::NewSession(tensorflow::SessionOptions()));
     Status session_create_status = session->Create(graph_def);
     if (!session_create_status.ok()) {
+      LOG(ERROR) << "Loading graph failed: " << session_create_status;
       throw GraphLoadException();
     }
   }

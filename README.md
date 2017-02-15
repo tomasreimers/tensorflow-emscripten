@@ -31,11 +31,15 @@ three options at the top which you are free to configure:
 Once you have configured the make file, run the following from the root of the repository:
 
 ```
-$ ./tensorflow/contrib/makefile_js/download_dependencies.sh
-$ ./tensorflow/contrib/makefile_js/gen_file_lists.sh
 $ emconfigure ./configure
+$ ./tensorflow/contrib/makefile_js/download_dependencies.sh
+$ bazel build tensorflow/examples/label_image/...
+$ ./tensorflow/contrib/makefile_js/gen_file_lists.sh
 $ emmake make -f ./tensorflow/contrib/makefile_js/Makefile
 ```
+
+*NOTE: Must run configure before download dependencies because otherwise the configure script
+will see build files in downloads and assume it should run those. Problem documented [here](https://github.com/tensorflow/tensorflow/issues/5310). The bazel command is required to be run so that tensorflow generates certain source files, there is probably a simpler build for bazel, but we found this one to work.*
 
 *TIP: Considering adding the flag '-jX' to the emmake command, which will multithread compilation with X threads.*
 
@@ -69,5 +73,9 @@ $ python run_trails.py {mnist,labeler} {browser,node,c}
 
 **(Which will benchmark mnist/labeler in the browser/node/c.)**
 
+## TODOs / Known Issues
+
+ - For some reason trying to include the protobuf library (libprotobuf.a, referred to as $(PROTOBUF_LIB) in the makefile) was causing me grief on Ubuntu. Something to do with the llvm error 'global referenced in another module!'. Was not tested thoroughly (I was debugging a host of other issues at the time so this may have been an emergent bug caused by those), but may be worth looking into. I suspect it's compiler tool chain related (or possibly flag related, noe how we use the flag `-all_load` on OSX)... Bug disappeared when I returned to developing on OSX.
+
 ## Author
-Tomas Reimers, September-December 2016
+Tomas Reimers, September 2016 - February 2017
