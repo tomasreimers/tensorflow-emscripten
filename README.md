@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # tensorflow-emscripten
 
 ## About
