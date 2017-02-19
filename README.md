@@ -75,6 +75,7 @@ $ python run_trails.py {mnist,labeler} {browser,node,c}
 ## TODOs / Known Issues
 
  - For some reason trying to include the protobuf library (libprotobuf.a, referred to as $(PROTOBUF_LIB) in the makefile) was causing me grief on Ubuntu. Something to do with the llvm error 'global referenced in another module!'. Was not tested thoroughly (I was debugging a host of other issues at the time so this may have been an emergent bug caused by those), but may be worth looking into. I suspect it's compiler tool chain related (or possibly flag related, noe how we use the flag `-all_load` on OSX)... Bug disappeared when I returned to developing on OSX.
+ - The above error was observed when working with Emscripten 1.37.1 on MacOSX, *FOR NOW: PLEASE BUILD WITH EMSCRIPTEN 1.36.5* (this may also be an issue caused if you build initially with one version of emscripten and then upgrade emscripten and continue building... need more investigation)
 
 ## Author
 Tomas Reimers, September 2016 - February 2017

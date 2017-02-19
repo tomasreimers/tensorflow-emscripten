@@ -308,13 +308,16 @@ $(LIB_PATH): $(LIB_OBJS)
 
 # for embind
 BIND_FLAG := --bind
+EXPORT_FLAG := -s EXPORT_NAME=\"TensorFlowJS\"
 ifeq ($(FINAL_PRODUCT),c)
 	BIND_FLAG :=
+	EXPORT_FLAG :=
 endif
 
 $(GR_NAME): $(GR_OBJS) $(LIB_PATH)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) \
+	$(EXPORT_FLAG) \
 	-o $(GR_NAME) $(GR_OBJS) \
 	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
 	$(PROTOBUF_LIB) \
