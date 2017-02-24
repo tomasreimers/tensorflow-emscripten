@@ -14,8 +14,8 @@ for (let ii = 0; ii < graph_bufview.length; ii++) {
 const sess = new lib.Session(graph);
 const results = sess.run(
   {
-    "Reshape": tensorjs.FloatTensor(mnist_data),
-    "dropout": tensorjs.FloatTensor(1.0)
+    "Reshape": tensorjs.floatTensor(mnist_data),
+    "dropout": tensorjs.floatTensor(1.0)
   },
   ["prediction_onehot"]
 );

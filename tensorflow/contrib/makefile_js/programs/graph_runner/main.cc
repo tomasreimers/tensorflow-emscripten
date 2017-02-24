@@ -97,15 +97,23 @@ public:
   JSSession(std::string graph): session()
   {
     // First we load and initialize the model.
-    // string graph_path = tensorflow::io::JoinPath(root_dir, graph);
     tensorflow::GraphDef graph_def;
-    // Status load_graph_status =
-    //     ReadBinaryProto(tensorflow::Env::Default(), graph, &graph_def);
-    // if (!load_graph_status.ok()) {
+
+    // need to parse from coded stream b/c Strings cannot be more than 64MiB by design
+    // https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.io.coded_stream#CodedInputStream.SetTotalBytesLimit.details
+    // see: https://github.com/google/protobuf/blob/7f3e23707122f31ebfa58b7280bd56cbe77cb44e/src/google/protobuf/message_lite.cc#L206 for how to do it
+
+    // if (!graph_def.ParseFromString(graph)) {
     //   throw GraphLoadException("Failed to load compute graph");
     // }
 
-    if (!graph_def.ParseFromString(graph)) {
+    google::protobuf::io::CodedInputStream graph_coded_stream(
+      reinterpret_cast<const uint8_t*>(graph.data()),
+      graph.size()
+    );
+    graph_coded_stream.SetTotalBytesLimit(INT_MAX, -1);
+
+    if (!graph_def.ParseFromCodedStream(&graph_coded_stream)) {
       throw GraphLoadException("Failed to load compute graph");
     }
 
@@ -191,6 +199,17 @@ std::string printDummyIntTensor(void) {
 
 #ifndef __MAKEFILE_JS__
 int main(int argc, char* argv[]) {
+  // IN CASE YOU WANT TO TEST LOADING A LARGE GRAPH:
+
+  // std::ifstream t("../../js_working_directory/tensorflow_inception_graph.pb");
+  // std::string graph_str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+  //
+  // JSSession sess(graph_str);
+  //
+  // return 0;
+
+  // IN CASE YOU WANT TO TEST A NORMAL PROGRAM
+
   std::ifstream t("../../js_working_directory/io_graph.pb");
   std::string graph_str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
 
