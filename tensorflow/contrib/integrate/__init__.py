@@ -27,11 +27,11 @@ sigma = 10.0
 beta = 8.0/3.0
 
 def lorenz_equation(state, t):
-  x, y, z = tf.unpack(state)
+  x, y, z = tf.unstack(state)
   dx = sigma * (y - x)
   dy = x * (rho - z) - y
   dz = x * y - beta * z
-  return tf.pack([dx, dy, dz])
+  return tf.stack([dx, dy, dz])
 
 init_state = tf.constant([0, 2, 20], dtype=tf.float64)
 t = np.linspace(0, 50, num=5000)
@@ -59,6 +59,7 @@ from __future__ import print_function
 
 # pylint: disable=wildcard-import
 from tensorflow.contrib.integrate.python.ops.odes import *
-from tensorflow.python.util.all_util import make_all
+from tensorflow.python.util.all_util import remove_undocumented
 
-__all__ = make_all(__name__)
+
+remove_undocumented(__name__)

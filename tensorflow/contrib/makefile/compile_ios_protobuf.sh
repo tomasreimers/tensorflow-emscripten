@@ -28,11 +28,7 @@ if [[ ! -f "./downloads/protobuf/autogen.sh" ]]; then
     exit 1
 fi
 
-if [ "$#" -gt 1 ]; then
-    JOBS_COUNT=$1
-else
-    JOBS_COUNT=4
-fi
+JOB_COUNT="${JOB_COUNT:-$(get_job_count)}"
 
 GENDIR=`pwd`/gen/protobuf_ios/
 LIBDIR=${GENDIR}lib
@@ -80,20 +76,23 @@ make distclean
 "CFLAGS=${CFLAGS} \
 -mios-simulator-version-min=${MIN_SDK_VERSION} \
 -arch i386 \
+-fembed-bitcode \
 -isysroot ${IPHONESIMULATOR_SYSROOT}" \
 "CXX=${CXX}" \
 "CXXFLAGS=${CXXFLAGS} \
 -mios-simulator-version-min=${MIN_SDK_VERSION} \
 -arch i386 \
+-fembed-bitcode \
 -isysroot \
 ${IPHONESIMULATOR_SYSROOT}" \
 LDFLAGS="-arch i386 \
+-fembed-bitcode \
 -mios-simulator-version-min=${MIN_SDK_VERSION} \
 ${LDFLAGS} \
 -L${IPHONESIMULATOR_SYSROOT}/usr/lib/ \
 -L${IPHONESIMULATOR_SYSROOT}/usr/lib/system" \
 "LIBS=${LIBS}"
-make -j ${JOBS_COUNT}
+make -j"${JOB_COUNT}"
 make install
 
 make distclean
@@ -107,20 +106,23 @@ make distclean
 "CFLAGS=${CFLAGS} \
 -mios-simulator-version-min=${MIN_SDK_VERSION} \
 -arch x86_64 \
+-fembed-bitcode \
 -isysroot ${IPHONESIMULATOR_SYSROOT}" \
 "CXX=${CXX}" \
 "CXXFLAGS=${CXXFLAGS} \
 -mios-simulator-version-min=${MIN_SDK_VERSION} \
 -arch x86_64 \
+-fembed-bitcode \
 -isysroot \
 ${IPHONESIMULATOR_SYSROOT}" \
 LDFLAGS="-arch x86_64 \
+-fembed-bitcode \
 -mios-simulator-version-min=${MIN_SDK_VERSION} \
 ${LDFLAGS} \
 -L${IPHONESIMULATOR_SYSROOT}/usr/lib/ \
 -L${IPHONESIMULATOR_SYSROOT}/usr/lib/system" \
 "LIBS=${LIBS}"
-make -j ${JOBS_COUNT}
+make -j"${JOB_COUNT}"
 make install
 
 make distclean
@@ -133,17 +135,20 @@ make distclean
 "CFLAGS=${CFLAGS} \
 -miphoneos-version-min=${MIN_SDK_VERSION} \
 -arch armv7 \
+-fembed-bitcode \
 -isysroot ${IPHONEOS_SYSROOT}" \
 "CXX=${CXX}" \
 "CXXFLAGS=${CXXFLAGS} \
 -miphoneos-version-min=${MIN_SDK_VERSION} \
 -arch armv7 \
+-fembed-bitcode \
 -isysroot ${IPHONEOS_SYSROOT}" \
 LDFLAGS="-arch armv7 \
+-fembed-bitcode \
 -miphoneos-version-min=${MIN_SDK_VERSION} \
 ${LDFLAGS}" \
 "LIBS=${LIBS}"
-make -j ${JOBS_COUNT}
+make -j"${JOB_COUNT}"
 make install
 
 make distclean
@@ -156,17 +161,20 @@ make distclean
 "CFLAGS=${CFLAGS} \
 -miphoneos-version-min=${MIN_SDK_VERSION} \
 -arch armv7s \
+-fembed-bitcode \
 -isysroot ${IPHONEOS_SYSROOT}" \
 "CXX=${CXX}" \
 "CXXFLAGS=${CXXFLAGS} \
 -miphoneos-version-min=${MIN_SDK_VERSION} \
 -arch armv7s \
+-fembed-bitcode \
 -isysroot ${IPHONEOS_SYSROOT}" \
 LDFLAGS="-arch armv7s \
+-fembed-bitcode \
 -miphoneos-version-min=${MIN_SDK_VERSION} \
 ${LDFLAGS}" \
 "LIBS=${LIBS}"
-make -j ${JOBS_COUNT}
+make -j"${JOB_COUNT}"
 make install
 
 make distclean
@@ -179,16 +187,19 @@ make distclean
 "CFLAGS=${CFLAGS} \
 -miphoneos-version-min=${MIN_SDK_VERSION} \
 -arch arm64 \
+-fembed-bitcode \
 -isysroot ${IPHONEOS_SYSROOT}" \
 "CXXFLAGS=${CXXFLAGS} \
 -miphoneos-version-min=${MIN_SDK_VERSION} \
 -arch arm64 \
+-fembed-bitcode \
 -isysroot ${IPHONEOS_SYSROOT}" \
 LDFLAGS="-arch arm64 \
+-fembed-bitcode \
 -miphoneos-version-min=${MIN_SDK_VERSION} \
 ${LDFLAGS}" \
 "LIBS=${LIBS}"
-make -j ${JOBS_COUNT}
+make -j"${JOB_COUNT}"
 make install
 
 lipo \

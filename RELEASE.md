@@ -1,4 +1,3 @@
-=======
 # Release 1.0.0
 
 ## Major Features and Improvements
@@ -192,6 +191,25 @@ answered questions, and were part of inspiring discussions.
 * `BusAdjacency` enum replaced with a protocol buffer `DeviceLocality`.  PCI bus
   indexing now starts from 1 instead of 0, and `bus_id==0` is used where
   previously `BUS_ANY` was used.
+* `Env::FileExists` and `FileSystem::FileExists` now return a tensorflow::Status
+  intead of a bool. Any callers to this function can be converted to a bool
+  by adding .ok() to the call.
+* The C API type `TF_SessionWithGraph` has been renamed to `TF_Session`,
+  indicating its preferred use in language bindings for TensorFlow.
+  What was previously `TF_Session` has been renamed to `TF_DeprecatedSession`.
+* Renamed `TF_Port` to `TF_Output` in the C API.
+* Removes RegisterShape from public API. Use C++ shape function registration instead.
+  indexing now starts from 1 instead of 0, and `bus_id==0` is used where
+  previously `BUS_ANY` was used.
+* Most RNN cells and RNN functions now use different variable scopes to be
+  consistent with layers (`tf.contrib.layers`).  This means old checkpoints
+  written using this code will not load after this change without providing
+  `Saver` a list of variable renames.  Examples of variable scope changes
+  include `RNN` -> `rnn` in `tf.nn.rnn`, `tf.nn.dynamic_rnn` and moving from
+  `Linear/Matrix` -> `weights` and `Linear/Bias` -> `biases` in most RNN cells.
+* Deprecated tf.select op. tf.where should be used instead.
+* `SparseTensor.shape` has been renamed to `SparseTensor.dense_shape`.  Same for
+  `SparseTensorValue.shape`.
 * `Env::FileExists` and `FileSystem::FileExists` now return a
   `tensorflow::Status` intead of a bool. Any callers to this function can be
   converted to a bool by adding `.ok()` to the call.
@@ -212,6 +230,9 @@ answered questions, and were part of inspiring discussions.
 * `tf.all_variables`, `tf.VARIABLES` and `tf.initialize_all_variables` renamed
   to `tf.global_variables`, `tf.GLOBAL_VARIABLES` and
   `tf.global_variables_initializer` respectively.
+* `tf.zeros_initializer()` and `tf.ones_initializer()` now return a callable
+  that must be called with initializer arguments, in your code replace
+  `tf.zeros_initializer` with `tf.zeros_initializer()`
 
 ## Bug Fixes and Other Changes
 

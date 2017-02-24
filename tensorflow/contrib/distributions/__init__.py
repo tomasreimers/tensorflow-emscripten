@@ -93,6 +93,11 @@ representing the posterior or posterior predictive.
 
 @@kl
 @@RegisterKL
+
+## Utilities
+
+@@softplus_inverse
+
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -110,6 +115,7 @@ from tensorflow.contrib.distributions.python.ops.dirichlet import *
 from tensorflow.contrib.distributions.python.ops.dirichlet_multinomial import *
 from tensorflow.contrib.distributions.python.ops.distribution import *
 from tensorflow.contrib.distributions.python.ops.distribution_util import matrix_diag_transform
+from tensorflow.contrib.distributions.python.ops.distribution_util import softplus_inverse
 from tensorflow.contrib.distributions.python.ops.exponential import *
 from tensorflow.contrib.distributions.python.ops.gamma import *
 from tensorflow.contrib.distributions.python.ops.inverse_gamma import *
@@ -128,3 +134,12 @@ from tensorflow.contrib.distributions.python.ops.uniform import *
 from tensorflow.contrib.distributions.python.ops.wishart import *
 
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
+
+from tensorflow.python.util.all_util import remove_undocumented
+
+_allowed_symbols = ['bijector',
+                    'ConditionalDistribution',
+                    'ConditionalTransformedDistribution',
+                    'FULLY_REPARAMETERIZED', 'NOT_REPARAMETERIZED']
+
+remove_undocumented(__name__, _allowed_symbols)
