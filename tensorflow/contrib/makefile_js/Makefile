@@ -1,6 +1,6 @@
 # Config
 # one of: html, js, c
-FINAL_PRODUCT := js
+FINAL_PRODUCT := c
 ALLOCATE_MEM_UPFRONT := true
 SINGLE_THREAD := true
 
@@ -218,7 +218,6 @@ GR_NAME := $(BINDIR)graph_runner$(FINAL_EXTENSION)
 # gen_file_lists.sh script.
 
 CORE_CC_ALL_SRCS := \
-tensorflow/core/util/version_info.cc \
 $(wildcard tensorflow/core/*.cc) \
 $(wildcard tensorflow/core/common_runtime/*.cc) \
 $(wildcard tensorflow/core/framework/*.cc) \
@@ -228,7 +227,8 @@ $(wildcard tensorflow/core/platform/*.cc) \
 $(wildcard tensorflow/core/platform/*/*.cc) \
 $(wildcard tensorflow/core/platform/*/*/*.cc) \
 $(wildcard tensorflow/core/util/*.cc) \
-$(wildcard tensorflow/core/util/*/*.cc)
+$(wildcard tensorflow/core/util/*/*.cc) \
+tensorflow/core/util/version_info.cc
 
 # Remove duplicates (for version_info.cc)
 CORE_CC_ALL_SRCS := $(sort $(CORE_CC_ALL_SRCS))
@@ -242,6 +242,7 @@ $(wildcard tensorflow/core/*/*/*testutil*) \
 $(wildcard tensorflow/core/*/*/*testlib*) \
 $(wildcard tensorflow/core/*/*/*main.cc) \
 $(wildcard tensorflow/core/debug/*.cc) \
+$(wildcard tensorflow/core/framework/op_gen_lib.cc) \
 $(wildcard tensorflow/core/graph/dot.*) \
 $(wildcard tensorflow/core/lib/gif/*) \
 $(wildcard tensorflow/core/lib/io/zlib*) \
@@ -250,11 +251,12 @@ $(wildcard tensorflow/core/lib/jpeg/*) \
 $(wildcard tensorflow/core/lib/png/*) \
 $(wildcard tensorflow/core/util/events_writer.*) \
 $(wildcard tensorflow/core/util/reporter.*) \
+$(wildcard tensorflow/core/platform/default/cuda_libdevice_path.*) \
 $(wildcard tensorflow/core/platform/default/stream_executor.*) \
 $(wildcard tensorflow/core/platform/default/test_benchmark.*) \
 $(wildcard tensorflow/core/platform/cuda.h) \
+$(wildcard tensorflow/core/platform/cuda_libdevice_path.*) \
 $(wildcard tensorflow/core/platform/cloud/*) \
-$(wildcard tensorflow/core/platform/profile_utils/*) \
 $(wildcard tensorflow/core/platform/google/*) \
 $(wildcard tensorflow/core/platform/google/*/*) \
 $(wildcard tensorflow/core/platform/jpeg.*) \
@@ -263,7 +265,8 @@ $(wildcard tensorflow/core/platform/stream_executor.*) \
 $(wildcard tensorflow/core/platform/windows/*) \
 $(wildcard tensorflow/core/user_ops/*.cu.cc) \
 $(wildcard tensorflow/core/common_runtime/gpu/*) \
-$(wildcard tensorflow/core/common_runtime/gpu_device_factory.*)
+$(wildcard tensorflow/core/common_runtime/gpu_device_factory.*) \
+tensorflow/core/platform/profile_utils/android_armv7a_cpu_utils_helper.cc
 
 # Filter out all the excluded files.
 TF_CC_SRCS := $(filter-out $(CORE_CC_EXCLUDE_SRCS), $(CORE_CC_ALL_SRCS))

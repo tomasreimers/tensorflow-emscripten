@@ -3,13 +3,10 @@ tensorflow/core/util/saved_tensor_slice.pb.cc
 tensorflow/core/util/memmapped_file_system.pb.cc
 tensorflow/core/util/event.pb.cc
 tensorflow/core/protobuf/tensorflow_server.pb.cc
-tensorflow/core/protobuf/tensor_bundle.pb.cc
 tensorflow/core/protobuf/saver.pb.cc
-tensorflow/core/protobuf/saved_model.pb.cc
 tensorflow/core/protobuf/queue_runner.pb.cc
 tensorflow/core/protobuf/named_tensor.pb.cc
 tensorflow/core/protobuf/meta_graph.pb.cc
-tensorflow/core/protobuf/control_flow.pb.cc
 tensorflow/core/protobuf/config.pb.cc
 tensorflow/core/protobuf/debug.pb.cc
 tensorflow/core/lib/core/error_codes.pb.cc
@@ -34,5 +31,4 @@ tensorflow/core/framework/cost_graph.pb.cc
 tensorflow/core/framework/attr_value.pb.cc
 tensorflow/core/framework/allocation_description.pb.cc
 tensorflow/core/example/feature.pb.cc
-tensorflow/core/example/example_parser_configuration.pb.cc
 tensorflow/core/example/example.pb.cc
