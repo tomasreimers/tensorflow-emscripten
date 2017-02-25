@@ -1,6 +1,6 @@
 # Config
 # one of: html, js, c
-FINAL_PRODUCT := c
+FINAL_PRODUCT := js
 ALLOCATE_MEM_UPFRONT := true
 SINGLE_THREAD := true
 

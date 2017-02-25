@@ -154,14 +154,14 @@ void scale_down_image(typename TTypes<T, 4>::ConstTensor images,
   if (channels == 3) {
     for (int b = 0; b < batch_size; ++b) {
       // Compute the interpolation
-      for (int64 y = 0; y < out_height; ++y) {
-        const int64 ys_lower = ys[y].lower;
-        const int64 ys_upper = ys[y].upper;
+      for (Eigen::Index y = 0; y < out_height; ++y) {
+        const Eigen::Index ys_lower = ys[y].lower;
+        const Eigen::Index ys_upper = ys[y].upper;
         const float ys_lerp = ys[y].lerp;
         const CachedInterpolation* xs_ptr = xs_vec.data();
-        for (int64 x = 0; x < out_width; ++x) {
-          const int64 xs_lower = xs_ptr->lower;
-          const int64 xs_upper = xs_ptr->upper;
+        for (Eigen::Index x = 0; x < out_width; ++x) {
+          const Eigen::Index xs_lower = xs_ptr->lower;
+          const Eigen::Index xs_upper = xs_ptr->upper;
           const float xs_lerp = xs_ptr->lerp;
           xs_ptr++;
 
@@ -196,14 +196,14 @@ void scale_down_image(typename TTypes<T, 4>::ConstTensor images,
   } else {
     for (int b = 0; b < batch_size; ++b) {
       // Compute the interpolation
-      for (int64 y = 0; y < out_height; ++y) {
+      for (Eigen::Index y = 0; y < out_height; ++y) {
         const CachedInterpolation* xs = xs_vec.data();
-        for (int64 x = 0; x < out_width; ++x) {
+        for (Eigen::Index x = 0; x < out_width; ++x) {
           for (int c = 0; c < channels; ++c) {
-            const float top_left(images(b, ys[y].lower, xs[x].lower, c));
-            const float top_right(images(b, ys[y].lower, xs[x].upper, c));
-            const float bottom_left(images(b, ys[y].upper, xs[x].lower, c));
-            const float bottom_right(images(b, ys[y].upper, xs[x].upper, c));
+            const float top_left(images(b, static_cast<Eigen::Index>(ys[y].lower), static_cast<Eigen::Index>(xs[x].lower), c));
+            const float top_right(images(b, static_cast<Eigen::Index>(ys[y].lower), static_cast<Eigen::Index>(xs[x].upper), c));
+            const float bottom_left(images(b, static_cast<Eigen::Index>(ys[y].upper), static_cast<Eigen::Index>(xs[x].lower), c));
+            const float bottom_right(images(b, static_cast<Eigen::Index>(ys[y].upper), static_cast<Eigen::Index>(xs[x].upper), c));
             output(b, y, x, c) =
                 compute_lerp(top_left, top_right, bottom_left, bottom_right,
                              xs[x].lerp, ys[y].lerp);
@@ -241,8 +241,8 @@ void scale_up_image(const T* input_image, const int batch_index,
         const float top_right(input_image[in_y_lower + in_x_upper + c]);
         const float bottom_left(input_image[in_y_upper + in_x_lower + c]);
         const float bottom_right(input_image[in_y_upper + in_x_upper + c]);
-        for (int64 y_inner = y; y_inner < y + ys[y].consecutive; ++y_inner) {
-          for (int64 x_inner = x; x_inner < x + xs[x].consecutive; ++x_inner) {
+        for (Eigen::Index y_inner = y; y_inner < y + ys[y].consecutive; ++y_inner) {
+          for (Eigen::Index x_inner = x; x_inner < x + xs[x].consecutive; ++x_inner) {
             output(batch_index, y_inner, x_inner, c) =
                 compute_lerp(top_left, top_right, bottom_left, bottom_right,
                              xs[x_inner].lerp, ys[y_inner].lerp);
@@ -270,13 +270,13 @@ void scale_similar_image(const T* input_image, const int b,
                          typename TTypes<float, 4>::Tensor output) {
   if (channels == 3) {
     // Compute the interpolation
-    for (int64 y = 0; y < out_height; ++y) {
+    for (Eigen::Index y = 0; y < out_height; ++y) {
       const int64 in_y_lower = ys[y].lower * in_width * channels;
       const int64 in_y_upper = ys[y].upper * in_width * channels;
       const float ys_lerp = ys[y].lerp;
       // Similar-sized images do not have a set of inner loops.
       const CachedInterpolation* xs_ptr = xs_vec.data();
-      for (int64 x = 0; x < out_width; ++x) {
+      for (Eigen::Index x = 0; x < out_width; ++x) {
         const int64 in_x_lower = xs_ptr->lower * 3;
         const int64 in_x_upper = xs_ptr->upper * 3;
         const float xs_lerp = xs_ptr->lerp;
@@ -299,13 +299,13 @@ void scale_similar_image(const T* input_image, const int b,
     }
   } else {
     // Compute the interpolation
-    for (int64 y = 0; y < out_height; ++y) {
+    for (Eigen::Index y = 0; y < out_height; ++y) {
       const int64 in_y_lower = ys[y].lower * in_width * channels;
       const int64 in_y_upper = ys[y].upper * in_width * channels;
       const float ys_lerp = ys[y].lerp;
       // Similar-sized images do not have a set of inner loops.
       const CachedInterpolation* xs_ptr = xs_vec.data();
-      for (int64 x = 0; x < out_width; ++x) {
+      for (Eigen::Index x = 0; x < out_width; ++x) {
         const int64 in_x_lower = xs_ptr->lower * channels;
         const int64 in_x_upper = xs_ptr->upper * channels;
         const float xs_lerp = xs_ptr->lerp;
