@@ -17,7 +17,7 @@
   "author": "Tomas Reimers",
   "license": "MIT",
   "dependencies": {
-    "tensorjs": "^0.2.0"
+    "tensorjs": "^0.3.1"
   },
   "devDependencies": {
     "canvas": "^1.6.2"

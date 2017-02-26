@@ -26,6 +26,12 @@ void Shard(int max_parallelism, thread::ThreadPool* workers, int64 total,
   if (total == 0) {
     return;
   }
+
+  #ifdef __SINGLE_THREAD__
+    work(0, total);
+    return;
+  #endif
+  
   if (max_parallelism <= 1) {
     // Just inline the whole work since we only have 1 thread (core).
     work(0, total);
