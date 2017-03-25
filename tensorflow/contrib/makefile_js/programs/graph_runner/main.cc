@@ -169,7 +169,7 @@ std::string tensorToString(Tensor t) {
 std::vector<std::string> tensorVectorToStringVector(std::vector<Tensor> input) {
   std::vector<std::string> output;
 
-  output.resize(input.size());
+  output.reserve(input.size());
 
   std::transform(input.begin(), input.end(), output.begin(), tensorToString);
 

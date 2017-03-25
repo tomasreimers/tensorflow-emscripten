@@ -4,10 +4,23 @@ FINAL_PRODUCT := js
 ALLOCATE_MEM_UPFRONT := true
 SINGLE_THREAD := true
 
+# to compile to wasm, you must be on the emscripten incoming branch
+# https://github.com/kripken/emscripten/wiki/WebAssembly#setup
+# Also, the version of Eigen that ships with TF v1.0.0 doesn't compile with
+# Clang 4.0, you may have to perform the following manual update:
+# https://bitbucket.org/eigen/eigen/diff/unsupported/Eigen/CXX11/src/Tensor/TensorStorage.h?diff2=8dd2d6552a87&at=default
+WEB_ASSEMBLY := false
+
 # verify consistency
 ifneq (,$(filter $(FINAL_PRODUCT),html js))
 ifneq ($(SINGLE_THREAD),true)
 $(error Must be single threaded to compile to HTML or JS)
+endif
+endif
+
+ifeq ($(WEB_ASSEMBLY),true)
+ifeq (,$(filter $(FINAL_PRODUCT),html js))
+$(error Must be HTML or JS to compile to WASM)
 endif
 endif
 
@@ -145,7 +158,8 @@ INCLUDES := \
 -I$(MAKEFILE_DIR)/downloads/gemmlowp/ \
 -I$(PROTOGENDIR) \
 -I$(PBTGENDIR) \
--I./bazel-genfiles/
+-I./bazel-genfiles/ \
+-I./bazel-tensorflow-emscripten/
 
 ifeq ($(HAS_GEN_HOST_PROTOC),true)
 	INCLUDES += -I$(MAKEFILE_DIR)/gen/protobuf-host/include
@@ -175,7 +189,7 @@ $(info PROTOC = "$(PROTOC)")
 $(info CC_PREFIX = "$(CC_PREFIX)")
 
 PROTOCFLAGS :=
-AR := ar
+AR := emar
 ARFLAGS := -r
 LIBFLAGS :=
 
@@ -213,6 +227,8 @@ ifeq ($(FINAL_PRODUCT),c)
 endif
 
 GR_NAME := $(BINDIR)graph_runner$(FINAL_EXTENSION)
+BM_MNIST_NAME := $(BINDIR)benchmark_mnist$(FINAL_EXTENSION)
+BM_INCEPTION_NAME := $(BINDIR)benchmark_inception$(FINAL_EXTENSION)
 
 # What sources we want to compile, derived from the main Bazel build using the
 # gen_file_lists.sh script.
@@ -279,6 +295,8 @@ TF_CC_SRCS += $(shell cat $(MAKEFILE_DIR)/tf_op_files.txt)
 PBT_CC_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_pb_text_files.txt)
 PROTO_SRCS := $(shell cat $(MAKEFILE_DIR)/tf_proto_files.txt)
 GR_SRCS := $(MAKEFILE_DIR)/programs/graph_runner/main.cc
+BM_MNIST_SRCS := $(MAKEFILE_DIR)/programs/benchmarks/benchmark_mnist.cc
+BM_INCEPTION_SRCS := $(MAKEFILE_DIR)/programs/benchmarks/benchmark_inception.cc
 
 # File names of the intermediate files target compilation generates.
 TF_CC_OBJS := $(addprefix $(OBJDIR), $(TF_CC_SRCS:.cc=.o))
@@ -288,6 +306,8 @@ PROTO_CC_SRCS := $(addprefix $(PROTOGENDIR), $(PROTO_SRCS:.proto=.pb.cc))
 PROTO_OBJS := $(addprefix $(OBJDIR), $(PROTO_SRCS:.proto=.pb.o))
 LIB_OBJS := $(PROTO_OBJS) $(TF_CC_OBJS) $(PBT_OBJS)
 GR_OBJS := $(addprefix $(OBJDIR), $(GR_SRCS:.cc=.o))
+BM_MNIST_OBJS := $(addprefix $(OBJDIR), $(BM_MNIST_SRCS:.cc=.o))
+BM_INCEPTION_OBJS := $(addprefix $(OBJDIR), $(BM_INCEPTION_SRCS:.cc=.o))
 PROTOBUF_LIB := $(MAKEFILE_DIR)/downloads/protobuf-emscripten/src/.libs/libprotobuf.a
 
 ifeq ($(FINAL_PRODUCT),c)
@@ -297,7 +317,7 @@ endif
 .PHONY: clean cleantarget
 
 # The target that's compiled if there's no command-line arguments.
-all: $(LIB_PATH) $(GR_NAME)
+all: $(LIB_PATH) $(GR_NAME) $(BM_MNIST_NAME) $(BM_INCEPTION_NAME)
 
 # Rules for target compilation.
 .phony_version_info:
@@ -315,11 +335,34 @@ ifeq ($(FINAL_PRODUCT),c)
 	BIND_FLAG :=
 endif
 
+WASM_FLAG :=
+ifeq ($(WEB_ASSEMBLY), true)
+	WASM_FLAG := -s WASM=1
+endif
+
 $(GR_NAME): $(GR_OBJS) $(LIB_PATH)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) \
-	$(EXPORT_FLAG) \
+	$(WASM_FLAG) \
 	-o $(GR_NAME) $(GR_OBJS) \
+	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
+	$(PROTOBUF_LIB) \
+	$(BIND_FLAG)
+
+$(BM_MNIST_NAME): $(BM_MNIST_OBJS) $(LIB_PATH)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) \
+	$(WASM_FLAG) \
+	-o $(BM_MNIST_NAME) $(BM_MNIST_OBJS) \
+	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
+	$(PROTOBUF_LIB) \
+	$(BIND_FLAG)
+
+$(BM_INCEPTION_NAME): $(BM_INCEPTION_OBJS) $(LIB_PATH)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) \
+	$(WASM_FLAG) \
+	-o $(BM_INCEPTION_NAME) $(BM_INCEPTION_OBJS) \
 	$(LIBFLAGS) $(LIB_OBJS) $(LDFLAGS) $(LIBS) \
 	$(PROTOBUF_LIB) \
 	$(BIND_FLAG)
